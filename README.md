@@ -16,7 +16,7 @@ CareFlow connects intake funnel events, verified operational capacity, local mar
 | Capacity reservation holds | **Intake drawer** | Reserve a verified potential fit as a capacity hold in a row-locked transaction (concurrent reservations can never exceed verified hours or the weekly new-start limit), release, automatic expiry; holds are explicitly **not appointments** |
 | Geographic market intelligence | **Market Map** | Offline hex-tile choropleth (fictional geography), five layers, transparent opportunity heuristic with missing-component ranges, small-cell suppression, provenance panel, admin refresh with ACS connector and fixture fallback |
 | Evidence-based growth missions | **Growth Missions** | Deterministic rules M1–M7 with saved evidence, dedupe per reporting week, capacity-gated demand rules, ops sign-off gates, approve/reject/status |
-| Referral drafting & experiments | **Missions → drafts**, **Experiments**, **Referral Network** | Template drafts from verified records + claim validator, edit/re-validate/approve, local preview/print only (send disabled), partner codes + QR, partner-randomized experiments with persisted HMAC assignments, Wilson/Newcombe intervals only when eligible, “insufficient evidence” otherwise |
+| Referral drafting & experiments | **Missions → drafts**, **Experiments**, **Referral Network** | Template drafts from verified records + claim validator, edit/re-validate/approve, local preview/print only (send disabled), partner codes + QR, partner- and site-week-randomized experiments with persisted HMAC assignments, Wilson/Newcombe intervals (individual) or cluster-robust intervals with clusters per arm (partner/site-week) only when eligible, “insufficient evidence” otherwise; **Equity audit** tab with aggregate payer-group access rates and small-cell suppression (never used for scoring, ranking, matching or exclusion) |
 | Synthetic demo that ties it together | seed + **Settings → Reset** | ~150 inquiries / ~900 events over 90 days across North (capacity bottleneck), West (unverified headroom) and South (benefits stalls); one-click reset to the exact seed state |
 
 ### The acceptance demo (≈3 minutes)
@@ -26,7 +26,7 @@ CareFlow connects intake funnel events, verified operational capacity, local mar
 2. **Edit capacity** on West → change Monday 1–6 pm RBT hours 5 → 6 → **Save & attest verified**. West flips to **Potential fit** with a score breakdown and a fresh evidence timestamp. Overview now shows West at 46 verified h/wk.
 3. *Growth Missions* → **Generate from current data** → a new **M2 West: connect families to verified open capacity** appears (plus M6/M7), each citing saved metrics. North never receives a demand mission.
 4. **Approve** (ops-gated) → **Referral packet** → validator confirms every claim traces to verified records → **Approve** → **Printable packet**. *Send* stays disabled.
-5. **Connect experiment** → partner-randomized, persisted HMAC assignments → results show **Insufficient evidence** with caveats (simulated, censored, clustered).
+5. **Connect experiment** → partner-randomized, persisted HMAC assignments → results show **Insufficient evidence** with caveats (simulated, censored, too few partner clusters per arm).
 6. *Settings* → **Reset demo to seed state** (or `pnpm db:reset`).
 
 All of the above is automated in [`apps/web/e2e/workflows.spec.ts`](apps/web/e2e/workflows.spec.ts).
@@ -122,3 +122,4 @@ US Census ACS 2024 5-year (B01001), CMS NPPES, IDEA Section 618 (context only) �
 | ![Intake drawer](docs/screenshots/02-intake-drawer-matches.png) | ![Capacity after edit](docs/screenshots/03b-capacity-after.png) |
 | ![Missions](docs/screenshots/05b-missions.png) | ![Market map](docs/screenshots/06-market-map.png) |
 | ![Approved packet](docs/screenshots/05a-approved-packet.png) | ![Experiment](docs/screenshots/05c-experiment.png) |
+| ![Equity audit](docs/screenshots/08-equity-audit.png) | |

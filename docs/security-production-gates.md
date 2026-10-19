@@ -24,6 +24,7 @@
 | Outbound | `DeliveryProvider.send` throws `FeatureDisabled`; no publishing; intake connector disabled | `connectors.test.ts`, `operations.test.ts` |
 | AI | Off by default; when enabled, payload built from an explicit allowlist of public business facts + aggregate evidence; LLM output must pass the claim validator or the template is used | `llm.ts`, `connectors.test.ts` |
 | Fairness | Matcher never uses reimbursement, severity, demographics; heuristic ranks places not people; no hard stop on intake for lack of capacity (alternate path shown) | `matching.ts`, `geo.ts` |
+| Equity audit | Aggregate-only payer-group access rates (`GET /equity`, `equity:read` = admin/growth/ops); tenant `minCellSize` primary + complementary suppression; counts only, no identifiers; never imported by matcher/missions (tested) | `equity.ts`, `equity.test.ts`, `analytics.test.ts`, `equity-route.test.ts` |
 | Remuneration | No referral fees/gifts/bounties; validator rejects remuneration language | `content.ts` |
 
 ## Risk registry
@@ -40,6 +41,7 @@
 | R8 | Retrospective metrics silently use today's capacity | Append-only `capacity_versions` + `staff_capacity_window_versions` written on every capacity save (DB trigger: windows immutable, a version can only be closed once); capacity-fit evaluated as of inquiry time; seed backfills history; mission evidence snapshots | Version payer participation and site profile too (still applied as currently recorded); retention policy for history rows |
 | R9 | Optional LLM vendor | Disabled; allowlisted payload | BAA + vendor review before enabling with any production data |
 | R10 | Partner-facing reporting | None shipped (aggregate internal only) | Small-cell suppression and lawful basis review before any external sharing |
+| R11 | Equity audit differencing | Per-column complementary suppression within one report; internal roles only | Users can still difference reports across filters (site, window). Before real data: disclosure review, fixed reporting windows / filter minimums, and suppression across linked tables |
 
 ## Gates before any real pilot (all required)
 

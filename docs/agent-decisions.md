@@ -30,7 +30,8 @@ This log records judgement calls made while implementing the PRD without routine
 * **CSP** allows inline scripts for Next.js bootstrapping (no third-party origins).
 * **Capacity history** versions the capacity sheet (windows + rules) only; payer participation, site profile and the onboarding backlog are applied as currently recorded when evaluating past cohorts (documented in metric definitions).
 * **Capacity holds** guard reservations only: a later capacity edit can reduce verified hours below already-reserved holds (the matcher then shows the shortfall; holds are not auto-released). Hold hours are subtracted from the site's weekly total rather than from specific day/time windows. The `expire-holds` job (like the other jobs) runs for one organization per invocation (Harbor by default).
-* **Experiment intervals** for partner/site-week randomization do not adjust for clustering (caveat shown).
+* **Experiment intervals** for partner/site-week randomization use a cluster-robust ratio-estimator variance with t critical values on min(k)−1 df, floored at the unclustered interval, and stay “insufficient evidence” below 10 clusters with data per arm (documented constant, not yet a tenant setting). This is a large-sample approximation; no small-sample corrections beyond the k/(k−1) factor (e.g. Bell–McCaffrey) or permutation inference are implemented. With the seed's nine eligible partners, the seeded partner experiment can never leave “insufficient evidence”.
+* **Equity audit** groups by payer *category* only (no demographic data exists by design); “match proposed” counts staff-selected sites and current proposed/reserved holds, so a hold later released no longer counts. Complementary suppression is per additive column (one dimension); it does not solve the general multi-table disclosure problem across arbitrary filter combinations (e.g. differencing two site filters).
 * **Markdown rendering** for drafts uses a small escaping renderer (headings, lists, emphasis, code) rather than a full CommonMark library.
 * **Turborepo** runs package tasks; there is no remote cache or CI workflow file committed (commands are documented; any CI can run them).
 
@@ -39,7 +40,6 @@ This log records judgement calls made while implementing the PRD without routine
 * No live NPPES ingestion (fixture only) and no TIGER/Line ZCTA geometry; real ACS rows fetched with a key appear in the ranking table but not on the tile map.
 * No `page_session` randomization (requires first-party web instrumentation).
 * Reserved capacity holds are not linked to scheduling: no appointment, session or staff assignment is created, and holds are not visible to families.
-* No equity-audit panel across payer groups (described in experiment design, not built).
 * Single locale (`en-US`); drafts are English only.
 * Consent records table is a schema placeholder only.
 * Dark mode is not implemented (desktop-first light theme per PRD visual language).
