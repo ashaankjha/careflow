@@ -34,7 +34,7 @@
 | R5 | No encryption-at-rest configuration in repo | Local dev only | Managed Postgres with KMS keys, TLS everywhere, backups tested |
 | R6 | Audit log lives in the same DB | Immutable trigger | Ship to append-only external store; retention policy |
 | R7 | Contact aliases are free text | Pattern + heuristics | Real contact data requires consent/authorization review, field-level encryption, access-request/deletion flows |
-| R8 | Capacity history not versioned | Evidence snapshots on missions | Versioned capacity for retrospective metrics |
+| R8 | Retrospective metrics silently use today's capacity | Append-only `capacity_versions` + `staff_capacity_window_versions` written on every capacity save (DB trigger: windows immutable, a version can only be closed once); capacity-fit evaluated as of inquiry time; seed backfills history; mission evidence snapshots | Version payer participation and site profile too (still applied as currently recorded); retention policy for history rows |
 | R9 | Optional LLM vendor | Disabled; allowlisted payload | BAA + vendor review before enabling with any production data |
 | R10 | Partner-facing reporting | None shipped (aggregate internal only) | Small-cell suppression and lawful basis review before any external sharing |
 

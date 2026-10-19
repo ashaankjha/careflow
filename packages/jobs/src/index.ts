@@ -1,4 +1,4 @@
-import { generateMissions, getDashboard, HARBOR, refreshMarket, userId, type Ctx, type Db } from "@careflow/db";
+import { expireHolds, generateMissions, getDashboard, HARBOR, refreshMarket, userId, type Ctx, type Db } from "@careflow/db";
 import { schema } from "@careflow/db";
 
 /**
@@ -33,6 +33,12 @@ export const JOBS: Job[] = [
     const r = await generateMissions(db, ctx);
     return { created: r.created.length, refreshed: r.refreshed.length, unchanged: r.unchanged.length };
   } },
+  {
+    name: "expire-holds",
+    schedule: "*/15 * * * *",
+    description: "Mark capacity holds past expires_at as released (capacity already ignores them at read time)",
+    run: (db, ctx) => expireHolds(db, ctx),
+  },
   { name: "refresh-market", schedule: "0 3 1 * *", description: "Public-data refresh with fixture fallback (ACS optional)", run: (db, ctx) => refreshMarket(db, ctx) },
 ];
 

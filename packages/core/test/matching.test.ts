@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { evaluateCenter, evaluateMatch, verifiedDirectHoursAvailable } from "../src/matching";
+import { evaluateCenter, evaluateMatch, HOLD_DISCLAIMER, reservationCheck, verifiedDirectHoursAvailable } from "../src/matching";
 import { DEFAULT_POLICY } from "../src/policy";
 import { center, ctx, daysAgo, NOW, PAYER_B, REQUEST } from "./fixtures";
 
@@ -124,5 +124,35 @@ describe("ranking", () => {
     const r = evaluateMatch(REQUEST, [center("c-1")], ctx());
     expect(r.disclaimer).toMatch(/Not an insurance eligibility determination/);
     expect(r.requiredStaffActions).toContain("Verify individual benefits and required authorization (not determined by CareFlow)");
+  });
+});
+
+describe("reservation check", () => {
+  it("a verified potential fit is reservable for the requested direct and supervision hours", () => {
+    const r = reservationCheck(evaluateCenter(REQUEST, center("c-1"), ctx()));
+    expect(r).toEqual({ ok: true, directWeeklyHours: 6, bcbaWeeklyHours: expect.closeTo(0.6, 6) });
+  });
+
+  it("uses the planning default when requested hours are missing", () => {
+    const r = reservationCheck(evaluateCenter({ ...REQUEST, requestedDirectHoursPerWeek: null }, center("c-1"), ctx()));
+    expect(r).toMatchObject({ ok: true, directWeeklyHours: DEFAULT_POLICY.planningDefaultDirectHours });
+  });
+
+  it("failing capacity gates are capacity conflicts", () => {
+    const held = reservationCheck(evaluateCenter(REQUEST, center("c-1", { holds: [{ directWeeklyHours: 20, bcbaWeeklyHours: 1 }] }), ctx()));
+    expect(held).toMatchObject({ ok: false, reason: "capacity_conflict", gates: [{ key: "rbt_schedule" }] });
+    const limited = reservationCheck(evaluateCenter(REQUEST, center("c-1", { startsLast7Days: 3, holds: [{ directWeeklyHours: 0, bcbaWeeklyHours: 0 }] }), ctx()));
+    expect(limited).toMatchObject({ ok: false, reason: "capacity_conflict", gates: [{ key: "new_start_limit" }] });
+  });
+
+  it("verification-needed or non-capacity failures are not reservable and are not capacity conflicts", () => {
+    const unknownPayer = center("c-1", { payers: [{ payerId: PAYER_B, status: "unknown", lastVerifiedAt: null }] });
+    expect(reservationCheck(evaluateCenter(REQUEST, unknownPayer, ctx()))).toMatchObject({ ok: false, reason: "not_potential_fit" });
+    const notAccepted = center("c-1", { payers: [{ payerId: PAYER_B, status: "not_accepted", lastVerifiedAt: daysAgo(5) }] });
+    expect(reservationCheck(evaluateCenter(REQUEST, notAccepted, ctx()))).toMatchObject({ ok: false, reason: "not_potential_fit" });
+  });
+
+  it("hold copy never presents a reservation as an appointment", () => {
+    expect(HOLD_DISCLAIMER).toMatch(/not an appointment/);
   });
 });

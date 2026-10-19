@@ -38,10 +38,34 @@ type Detail = {
   referral: { code: string; partnerName: string | null } | null;
 };
 
+type Hold = {
+  id: string;
+  centerId: string;
+  centerName: string;
+  status: "proposed" | "reserved" | "released";
+  effectiveStatus: "proposed" | "reserved" | "released" | "expired";
+  active: boolean;
+  directWeeklyHoursEstimate: number;
+  bcbaWeeklyHoursEstimate: number;
+  expiresAt: string;
+  reservedAt: string | null;
+  releasedAt: string | null;
+  releaseReason: string | null;
+};
+type Holds = { holds: Hold[]; disclaimer: string; canReserve: boolean; canRelease: boolean };
+
+const HOLD_STATUS: Record<Hold["effectiveStatus"], { label: string; tone: "good" | "warn" | "ink" | "outline" }> = {
+  reserved: { label: "Reserved — not an appointment", tone: "good" },
+  proposed: { label: "Proposed", tone: "warn" },
+  released: { label: "Released", tone: "outline" },
+  expired: { label: "Expired", tone: "outline" },
+};
+
 export function InquiryDrawer({ id, onClose, perms, owners, centers, tz }: { id: string | null; onClose: () => void; perms: Perms; owners: { id: string; displayName: string }[]; centers: Option[]; tz: string }) {
   const router = useRouter();
   const [detail, setDetail] = useState<Detail | null>(null);
   const [match, setMatch] = useState<{ result: MatchResult; snapshots: { generatedAt: string }[] } | null>(null);
+  const [holds, setHolds] = useState<Holds | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<Stage | null>(null);
   const [reason, setReason] = useState("");
@@ -51,9 +75,14 @@ export function InquiryDrawer({ id, onClose, perms, owners, centers, tz }: { id:
     if (!id) return;
     setError(null);
     try {
-      const [d, m] = await Promise.all([api<Detail>(`/inquiries/${id}`), api<{ result: MatchResult; snapshots: { generatedAt: string }[] }>(`/inquiries/${id}/matches`)]);
+      const [d, m, h] = await Promise.all([
+        api<Detail>(`/inquiries/${id}`),
+        api<{ result: MatchResult; snapshots: { generatedAt: string }[] }>(`/inquiries/${id}/matches`),
+        api<Holds>(`/inquiries/${id}/holds`),
+      ]);
       setDetail(d);
       setMatch(m);
+      setHolds(h);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Could not load inquiry");
     }
@@ -62,6 +91,7 @@ export function InquiryDrawer({ id, onClose, perms, owners, centers, tz }: { id:
   useEffect(() => {
     setDetail(null);
     setMatch(null);
+    setHolds(null);
     setPending(null);
     void load();
   }, [load]);
@@ -95,6 +125,8 @@ export function InquiryDrawer({ id, onClose, perms, owners, centers, tz }: { id:
   const next = inq ? allowedTransitions(inq.stage) : [];
   const forward = next.filter((s) => !["waitlisted", "closed_unserviceable", "withdrawn", "inactive"].includes(s));
   const exits = next.filter((s) => !forward.includes(s));
+  const reservedHold = holds?.holds.find((h) => h.effectiveStatus === "reserved") ?? null;
+  const canReserveHere = !!holds?.canReserve && !!inq && !["started", "closed_unserviceable", "withdrawn", "inactive"].includes(inq.stage);
 
   return (
     <Sheet
@@ -198,11 +230,46 @@ export function InquiryDrawer({ id, onClose, perms, owners, centers, tz }: { id:
                 selectable={perms.persist}
                 selectedCenterId={inq.centerId}
                 onSelect={(centerId) => void act(() => api(`/inquiries/${id}/select-center`, { body: { centerId, idempotencyKey: idemKey("sel") } }), `Target site set: ${centers.find((c) => c.id === centerId)?.name}`)}
+                reservedCenterId={reservedHold?.centerId ?? null}
+                onReserve={
+                  canReserveHere
+                    ? (centerId) => void act(() => api(`/inquiries/${id}/holds`, { body: { centerId } }), `Capacity hold reserved at ${centers.find((c) => c.id === centerId)?.name} — not an appointment`)
+                    : undefined
+                }
               />
             ) : (
               <div className="text-[13px] text-ink-3">Evaluating…</div>
             )}
           </section>
+
+          {holds && holds.holds.length > 0 && (
+            <section aria-label="Capacity holds" className="rounded-xl border border-line bg-surface p-4" data-testid="holds">
+              <h3 className="mb-1 text-[14px] font-semibold">Capacity holds</h3>
+              <p className="mb-3 text-[11.5px] leading-5 text-ink-3">{holds.disclaimer}</p>
+              <ul className="space-y-2">
+                {holds.holds.map((h) => {
+                  const st = HOLD_STATUS[h.effectiveStatus];
+                  return (
+                    <li key={h.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line px-3 py-2 text-[12.5px]" data-testid={`hold-${h.effectiveStatus}`}>
+                      <span className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium">{h.centerName}</span>
+                        <Badge tone={st.tone}>{st.label}</Badge>
+                        <span className="text-ink-3 tabular">{h.directWeeklyHoursEstimate} direct h/wk · {h.bcbaWeeklyHoursEstimate.toFixed(1)} BCBA h/wk</span>
+                      </span>
+                      <span className="flex items-center gap-2 text-[11.5px] text-ink-3">
+                        {h.active ? `Expires ${fmtDateTime(h.expiresAt, tz)}` : h.releasedAt ? `Released ${fmtDateTime(h.releasedAt, tz)}${h.releaseReason ? ` · ${titleCase(h.releaseReason)}` : ""}` : `Expired ${fmtDateTime(h.expiresAt, tz)}`}
+                        {h.active && holds.canRelease && (
+                          <Button size="sm" variant="ghost" loading={busy} onClick={() => void act(() => api(`/holds/${h.id}/release`, { body: {} }), "Capacity hold released")} data-testid="release-hold">
+                            Release
+                          </Button>
+                        )}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
 
           <section aria-label="Event timeline">
             <h3 className="mb-2 text-[14px] font-semibold">Immutable event timeline</h3>

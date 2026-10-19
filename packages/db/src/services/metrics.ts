@@ -13,7 +13,7 @@ import {
 } from "@careflow/core";
 import { sql, type SQL } from "drizzle-orm";
 import type { Executor } from "../client";
-import { loadMatchCenters } from "./capacity";
+import { loadCapacityTimeline, loadMatchCenters } from "./capacity";
 import { assertCan, nowOf, type Ctx } from "./context";
 import { inquiryToMatchRequest } from "./matching";
 import { getOrg, getPolicy } from "./org";
@@ -218,12 +218,15 @@ export async function referralAttribution(db: Executor, orgId: string, f: Metric
 
 /**
  * capacity_fit_rate: cohort inquiries with ≥1 verified potential fit / cohort
- * inquiries with required inputs, evaluated against the CURRENT verified
- * capacity snapshot. Missing-data rate reported separately.
+ * inquiries with required inputs. Each inquiry is evaluated AS OF its creation
+ * time: the capacity version in force then (windows, rules, verification
+ * timestamps), the holds active then and verified starts in the 7 days before.
+ * Missing-data rate and inquiries with no capacity version in force are reported
+ * separately. `capacityDetail` (verified hours available now) uses current capacity.
  */
 export async function capacityFit(db: Executor, ctx: Ctx, f: MetricFilters) {
   const policy = await getPolicy(db, ctx);
-  const centersData = await loadMatchCenters(db, ctx);
+  const [centersData, timeline] = await Promise.all([loadMatchCenters(db, ctx), loadCapacityTimeline(db, ctx)]);
   const zctas = await rows<{ zcta5: string; lat: number; lng: number }>(
     db,
     sql`select distinct on (zcta5) zcta5, centroid_lat as lat, centroid_lng as lng from geo_signals where organization_id = ${ctx.orgId} order by zcta5, as_of_year desc`,
@@ -237,14 +240,16 @@ export async function capacityFit(db: Executor, ctx: Ctx, f: MetricFilters) {
     preferred_modes: string[];
     preferred_time_windows: unknown;
     requested_direct_hours: number | null;
+    created_at: Date | string;
   }>(
     db,
-    sql`select i.id, i.center_id, i.service_zip, i.payer_id, i.preferred_modes, i.preferred_time_windows, i.requested_direct_hours
+    sql`select i.id, i.center_id, i.service_zip, i.payer_id, i.preferred_modes, i.preferred_time_windows, i.requested_direct_hours, i.created_at
         from inquiries i where ${inquiryFilter(ctx.orgId, f)} and i.created_at >= ${f.from} and i.created_at < ${f.to}`,
   );
   const now = nowOf(ctx);
   let withInputs = 0;
   let fit = 0;
+  let withoutVersion = 0;
   const perCenter = new Map<string, { evaluated: number; notFeasibleAtCenter: number; fitAnywhere: number }>();
   for (const q of cohort) {
     const windows = (q.preferred_time_windows as unknown[]) ?? [];
@@ -258,7 +263,9 @@ export async function capacityFit(db: Executor, ctx: Ctx, f: MetricFilters) {
       preferredTimeWindows: windows,
       requestedDirectHours: q.requested_direct_hours,
     });
-    const res = evaluateMatch(req, centersData, { now, policy, zcta: zmap.get(q.service_zip) ?? null });
+    const asOf = new Date(q.created_at);
+    if (!timeline.covered(asOf)) withoutVersion++;
+    const res = evaluateMatch(req, timeline.at(asOf), { now: asOf, policy, zcta: zmap.get(q.service_zip) ?? null });
     const anyFit = res.status === "potential_fit";
     if (anyFit) fit++;
     if (q.center_id) {
@@ -275,6 +282,7 @@ export async function capacityFit(db: Executor, ctx: Ctx, f: MetricFilters) {
     denominator: withInputs,
     missingInputs: cohort.length - withInputs,
     cohort: cohort.length,
+    withoutCapacityVersion: withoutVersion,
     perCenter,
     capacityDetail: centersData.map((c) => ({ centerId: c.id, ...verifiedDirectHoursAvailable(c, { now, policy }) })),
   };
@@ -405,6 +413,8 @@ export async function getDashboard(db: Executor, ctx: Ctx, f: MetricFilters) {
         denominator: fit.denominator,
         missingInputs: fit.missingInputs,
         cohort: fit.cohort,
+        asOf: "inquiry_created_at" as const,
+        withoutCapacityVersion: fit.withoutCapacityVersion,
       },
       unresolved_stalls: { value: totalStalled, numerator: totalStalled, denominator: totalActive },
     },

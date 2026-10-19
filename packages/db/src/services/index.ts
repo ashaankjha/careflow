@@ -2,6 +2,7 @@ export * from "./context";
 export * from "./audit";
 export * from "./org";
 export * from "./capacity";
+export * from "./holds";
 export * from "./matching";
 export * from "./inquiries";
 export * from "./metrics";

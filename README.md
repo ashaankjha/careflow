@@ -10,9 +10,10 @@ CareFlow connects intake funnel events, verified operational capacity, local mar
 
 | Capability | Where | Highlights |
 |---|---|---|
-| Multi-location growth dashboard | **Overview** | KPIs computed live from the immutable event log (care starts, cohort start rate, first-response, inquiry-to-start, capacity-fit, stalls) — each with definition, numerator and denominator; site demand-vs-capacity matrix; trend; stage drop-off; attribution with an explicit *unattributed* bucket; provenance |
+| Multi-location growth dashboard | **Overview** | KPIs computed live from the immutable event log (care starts, cohort start rate, first-response, inquiry-to-start, capacity-fit as of inquiry time, stalls) — each with definition, numerator and denominator; site demand-vs-capacity matrix; trend; stage drop-off; attribution with an explicit *unattributed* bucket; provenance |
 | Intake funnel | **Intake Funnel** | Filterable table (TanStack) + Kanban, owner queues, stall flags, add simulated inquiry (PII guard), CSV preview/idempotent import, drawer with immutable timeline, quick stage transitions, outreach logging, site selection, match snapshots, aggregate-only CSV export |
-| Capacity-aware matching | **Capacity & Matching** | Ops editors for payer status and staff windows (optimistic locking, attest-as-verified), explainable hard gates (geography, payer, mode, age policy, RBT schedule, BCBA supervision, weekly start limit), soft score breakdown, `verification_needed` / `no_feasible_match` states, “Test a match” |
+| Capacity-aware matching | **Capacity & Matching** | Ops editors for payer status and staff windows (optimistic locking, attest-as-verified, every save versioned for as-of metrics), explainable hard gates (geography, payer, mode, age policy, RBT schedule, BCBA supervision, weekly start limit), soft score breakdown, `verification_needed` / `no_feasible_match` states, “Test a match” |
+| Capacity reservation holds | **Intake drawer** | Reserve a verified potential fit as a capacity hold in a row-locked transaction (concurrent reservations can never exceed verified hours or the weekly new-start limit), release, automatic expiry; holds are explicitly **not appointments** |
 | Geographic market intelligence | **Market Map** | Offline hex-tile choropleth (fictional geography), five layers, transparent opportunity heuristic with missing-component ranges, small-cell suppression, provenance panel, admin refresh with ACS connector and fixture fallback |
 | Evidence-based growth missions | **Growth Missions** | Deterministic rules M1–M7 with saved evidence, dedupe per reporting week, capacity-gated demand rules, ops sign-off gates, approve/reject/status |
 | Referral drafting & experiments | **Missions → drafts**, **Experiments**, **Referral Network** | Template drafts from verified records + claim validator, edit/re-validate/approve, local preview/print only (send disabled), partner codes + QR, partner-randomized experiments with persisted HMAC assignments, Wilson/Newcombe intervals only when eligible, “insufficient evidence” otherwise |
@@ -65,10 +66,10 @@ The login page has one-click persona buttons.
 | `pnpm db:migrate` | Apply typed Drizzle migrations (+ hand-written integrity/RLS migration) |
 | `pnpm db:seed` / `pnpm db:reset` | Seed / **reset everything to the exact seed state** (one command) |
 | `pnpm demo:reset` | Migrate + reset in one go |
-| `pnpm jobs <name>` | Run a cron-compatible job manually: `compute-daily-metrics`, `generate-missions`, `refresh-market` |
+| `pnpm jobs <name>` | Run a cron-compatible job manually: `compute-daily-metrics`, `generate-missions`, `expire-holds`, `refresh-market` |
 | `pnpm lint` · `pnpm typecheck` | ESLint (flat config) · strict TypeScript, all packages |
 | `pnpm test` | Vitest: core domain, connectors, DB integration (uses `TEST_DATABASE_URL`), API wrapper |
-| `pnpm test:e2e` | Playwright: production build, 7 demo workflows + security + keyboard + mobile; writes `docs/screenshots/` |
+| `pnpm test:e2e` | Playwright: production build, 7 demo workflows + capacity-hold reserve/release + security + keyboard + mobile; writes `docs/screenshots/` |
 
 `pnpm test` creates/migrates/reseeds `careflow_test` (it refuses any URL without “test” in it). `pnpm test:e2e` reseeds the main database first.
 
