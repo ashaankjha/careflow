@@ -1,0 +1,305 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`en-US output is unchanged > internal_plan matches the pre-locale snapshot 1`] = `
+{
+  "bodyMd": "# Internal plan: West Center
+
+## Evidence (from saved metrics)
+- No evidence attached
+
+## Explanation
+
+
+## Proposed action
+
+
+## Guardrail
+
+
+## Measurement
+- Hypothesis: —
+- Primary metric: \`—\` on the CareFlow dashboard
+- Guardrails: —
+
+## Review checklist
+- [ ] Operations confirmed current verified capacity (46 direct h/wk as of 2026-10-15)
+- [ ] Payer details verified within policy
+- [ ] No family-level data used or shared
+- [ ] Owner and review date assigned
+
+## Halt conditions
+- Verified capacity drops below the mission threshold
+- Median first response time worsens beyond SLA
+- Close-without-resolution rate increases
+",
+  "title": "Internal growth plan — West Center",
+}
+`;
+
+exports[`en-US output is unchanged > internal_plan matches the pre-locale snapshot 2`] = `
+{
+  "bodyMd": "# Internal plan: Fill verified West capacity
+
+## Evidence (from saved metrics)
+- **Verified direct h/wk available**: 46 (as of 2026-10-15; metric \`verified_weekly_direct_hours_available\`)
+- **Inquiries vs peer median**: 8 / 20 (last 30 days; metric \`inquiries\`)
+
+## Explanation
+West has verified unbooked hours.
+
+## Proposed action
+Share the factual referral packet with partners.
+
+## Guardrail
+Pause if verified capacity drops.
+
+## Measurement
+- Hypothesis: A factual packet increases verified starts.
+- Primary metric: \`care_starts\` on the CareFlow dashboard
+- Guardrails: \`median_first_response\`, \`close_without_resolution\`
+
+## Review checklist
+- [ ] Operations confirmed current verified capacity (46 direct h/wk as of 2026-10-15)
+- [ ] Payer details verified within policy
+- [ ] No family-level data used or shared
+- [ ] Owner and review date assigned
+
+## Halt conditions
+- Verified capacity drops below the mission threshold
+- Median first response time worsens beyond SLA
+- Close-without-resolution rate increases
+",
+  "title": "Internal growth plan — Fill verified West capacity",
+}
+`;
+
+exports[`en-US output is unchanged > partner_packet matches the pre-locale snapshot 1`] = `
+{
+  "bodyMd": "# Referral information for professional partners
+**Harbor Behavioral Services (DEMO) · West Center**
+200 Demo Way, Harbor Bay (DEMO), DM 00105
+
+## Service area
+We serve families within approximately 11 miles of the center (service-area ZCTAs: 00101, 00105, 00106).
+
+## Services at this location
+- Center-based, Telehealth (if applicable)
+- Practice policy: ages 2–16 (confirm with intake).
+
+## Insurance plans
+- Cascade Commercial (DEMO) — participation verified by staff on 2026-10-01
+- Meridian Medicaid Plan (DEMO) — participation verified by staff on 2026-10-01
+
+Plan participation is listed as recorded by our staff and is **subject to verification**. It does not confirm any individual family's coverage, benefits, or authorization.
+
+## How to refer
+- Share our intake contact with the family, or have the family contact us directly.
+- **Do not send diagnoses, records, or insurance details by regular email or fax cover notes.** Our intake team will provide a secure channel.
+- Optional: families may mention referral code **BAYPEDS** so we can count referrals in aggregate. We never share an individual family's status with referring partners.
+
+## What happens next
+Our intake team contacts the family, reviews scheduling preferences, and our staff verify benefits and any required authorization. We do not quote wait times or promise start dates in advance.
+
+## Intake contact
+- Phone: 555-0101 (demo)
+- Email: west@harbor.demo
+
+_We do not offer gifts, payments, or anything of value for referrals._
+",
+  "title": "Professional referral information — West Center",
+}
+`;
+
+exports[`en-US output is unchanged > partner_packet matches the pre-locale snapshot 2`] = `
+{
+  "bodyMd": "# Referral information for professional partners
+**Harbor Behavioral Services (DEMO) · West Center**
+200 Demo Way, Harbor Bay (DEMO), DM 00105
+
+## Service area
+We serve families within approximately 11 miles of the center (service-area ZCTAs: 00101, 00105, 00106).
+
+## Services at this location
+- Center-based, Telehealth (if applicable)
+- Practice policy: ages 2–16 (confirm with intake).
+
+## Insurance plans
+- No payer participation is currently verified for this location. Please contact intake.
+
+Plan participation is listed as recorded by our staff and is **subject to verification**. It does not confirm any individual family's coverage, benefits, or authorization.
+
+## How to refer
+- Share our intake contact with the family, or have the family contact us directly.
+- **Do not send diagnoses, records, or insurance details by regular email or fax cover notes.** Our intake team will provide a secure channel.
+
+## What happens next
+Our intake team contacts the family, reviews scheduling preferences, and our staff verify benefits and any required authorization. We do not quote wait times or promise start dates in advance.
+
+## Intake contact
+- Phone: 555-0101 (demo)
+- Email: west@harbor.demo
+
+_We do not offer gifts, payments, or anything of value for referrals._
+",
+  "title": "Professional referral information — West Center",
+}
+`;
+
+exports[`en-US output is unchanged > referral_email matches the pre-locale snapshot 1`] = `
+{
+  "bodyMd": "**Subject:** Referral information for West Center
+
+Hello Bayview Pediatrics Group (DEMO) team,
+
+I'm reaching out from Harbor Behavioral Services (DEMO) to share up-to-date information about ABA services at West Center (Harbor Bay (DEMO), DM). We'd welcome the chance to be a resource for families you work with.
+
+- Services: Center-based, Telehealth (if applicable)
+- Service area: about 11 miles around the center
+- Plans with staff-verified participation: Cascade Commercial (DEMO), Meridian Medicaid Plan (DEMO) (subject to verification of each family's benefits)
+
+Our one-page referral sheet is attached for your reference. Please don't include patient details in email; families can contact our intake team directly at 555-0101 (demo).
+
+Thank you,
+[Staff name], Harbor Behavioral Services (DEMO)
+
+_DRAFT — requires human review. Sending is disabled in this demo._
+",
+  "title": "Draft introduction email — West Center",
+}
+`;
+
+exports[`en-US output is unchanged > referral_email matches the pre-locale snapshot 2`] = `
+{
+  "bodyMd": "**Subject:** Referral information for West Center
+
+Hello,
+
+I'm reaching out from Harbor Behavioral Services (DEMO) to share up-to-date information about ABA services at West Center (Harbor Bay (DEMO), DM). We'd welcome the chance to be a resource for families you work with.
+
+- Services: Center-based, Telehealth (if applicable)
+- Service area: about 11 miles around the center
+- Plans with staff-verified participation: please contact intake (subject to verification of each family's benefits)
+
+Our one-page referral sheet is attached for your reference. Please don't include patient details in email; families can contact our intake team directly at 555-0101 (demo).
+
+Thank you,
+[Staff name], Harbor Behavioral Services (DEMO)
+
+_DRAFT — requires human review. Sending is disabled in this demo._
+",
+  "title": "Draft introduction email — West Center",
+}
+`;
+
+exports[`en-US output is unchanged > seo_page matches the pre-locale snapshot 1`] = `
+{
+  "bodyMd": "# West Center
+
+Harbor Behavioral Services (DEMO) provides applied behavior analysis (ABA) services at West Center, 200 Demo Way, Harbor Bay (DEMO), DM 00105.
+
+## Services offered at this location
+- Service modes: Center-based, Telehealth (if applicable)
+- Operational service area: approximately 11 miles from the center
+- Practice policy: ages 2–16 (confirm with intake).
+
+## Insurance plans
+- Cascade Commercial (DEMO) — participation verified by staff on 2026-10-01
+- Meridian Medicaid Plan (DEMO) — participation verified by staff on 2026-10-01
+
+Plan participation is listed as recorded by our staff and is **subject to verification**. It does not confirm any individual family's coverage, benefits, or authorization.
+
+## How the inquiry process works
+1. Contact our intake team by phone or the clinic's interest form.
+2. An intake coordinator follows up to learn about scheduling preferences and insurance.
+3. Our staff verify benefits and any required authorization with your plan.
+4. If services are a fit, the clinical team coordinates an assessment.
+
+Timeframes vary by plan and staffing; our team will explain next steps directly.
+
+## Frequently asked questions
+**Do I need a referral?** Requirements depend on your plan. Our intake team can explain what your plan typically asks for.
+
+**Can I tour the center?** Ask our intake coordinator about visiting options.
+
+**What should I avoid sending by email?** Please do not email medical records or insurance cards. Intake will share a secure method.
+
+## Contact
+- Intake phone: 555-0101 (demo)
+- Intake email: west@harbor.demo
+
+<!-- schema.org (factual fields only) -->
+\`\`\`json
+{
+  "@context": "https://schema.org",
+  "@type": "MedicalBusiness",
+  "name": "West Center",
+  "address": {
+    "@type": "PostalAddress",
+    "streetAddress": "200 Demo Way",
+    "addressLocality": "Harbor Bay (DEMO)",
+    "addressRegion": "DM",
+    "postalCode": "00105"
+  },
+  "telephone": "555-0101 (demo)"
+}
+\`\`\`
+",
+  "title": "West Center — ABA therapy services in Harbor Bay (DEMO)",
+}
+`;
+
+exports[`en-US output is unchanged > seo_page matches the pre-locale snapshot 2`] = `
+{
+  "bodyMd": "# West Center
+
+Harbor Behavioral Services (DEMO) provides applied behavior analysis (ABA) services at West Center, 200 Demo Way, Harbor Bay (DEMO), DM 00105.
+
+## Services offered at this location
+- Service modes: Center-based, Telehealth (if applicable)
+- Operational service area: approximately 11 miles from the center
+- Practice policy: ages 2–16 (confirm with intake).
+
+## Insurance plans
+- No payer participation is currently verified for this location. Please contact intake.
+
+Plan participation is listed as recorded by our staff and is **subject to verification**. It does not confirm any individual family's coverage, benefits, or authorization.
+
+## How the inquiry process works
+1. Contact our intake team by phone or the clinic's interest form.
+2. An intake coordinator follows up to learn about scheduling preferences and insurance.
+3. Our staff verify benefits and any required authorization with your plan.
+4. If services are a fit, the clinical team coordinates an assessment.
+
+Timeframes vary by plan and staffing; our team will explain next steps directly.
+
+## Frequently asked questions
+**Do I need a referral?** Requirements depend on your plan. Our intake team can explain what your plan typically asks for.
+
+**Can I tour the center?** Ask our intake coordinator about visiting options.
+
+**What should I avoid sending by email?** Please do not email medical records or insurance cards. Intake will share a secure method.
+
+## Contact
+- Intake phone: 555-0101 (demo)
+- Intake email: west@harbor.demo
+
+<!-- schema.org (factual fields only) -->
+\`\`\`json
+{
+  "@context": "https://schema.org",
+  "@type": "MedicalBusiness",
+  "name": "West Center",
+  "address": {
+    "@type": "PostalAddress",
+    "streetAddress": "200 Demo Way",
+    "addressLocality": "Harbor Bay (DEMO)",
+    "addressRegion": "DM",
+    "postalCode": "00105"
+  },
+  "telephone": "555-0101 (demo)"
+}
+\`\`\`
+",
+  "title": "West Center — ABA therapy services in Harbor Bay (DEMO)",
+}
+`;

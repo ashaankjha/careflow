@@ -9,6 +9,11 @@ export const SERVICE_MODE_LABELS: Record<ServiceMode, string> = {
   telehealth_if_applicable: "Telehealth (if applicable)",
 };
 
+/** Locales for generated drafts. es-US templates are machine-authored and need review by a qualified human translator. */
+export const DRAFT_LOCALES = ["en-US", "es-US"] as const;
+export type DraftLocale = (typeof DRAFT_LOCALES)[number];
+export const DRAFT_LOCALE_LABELS: Record<DraftLocale, string> = { "en-US": "English (US)", "es-US": "Spanish (US) — needs translator review" };
+
 export const SOURCE_CHANNELS = [
   "website_form",
   "phone",

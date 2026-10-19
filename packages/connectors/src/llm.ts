@@ -1,4 +1,4 @@
-import { renderDraft, validateDraft, type DraftKind, type VerifiedFacts } from "@careflow/core";
+import { renderDraft, validateDraft, type DraftKind, type DraftLocale, type VerifiedFacts } from "@careflow/core";
 
 /**
  * Optional AI narrative adapter. The payload is built from an explicit
@@ -8,6 +8,7 @@ import { renderDraft, validateDraft, type DraftKind, type VerifiedFacts } from "
 export type LlmPayload = {
   task: "paraphrase_draft";
   kind: DraftKind;
+  locale: DraftLocale;
   facts: {
     orgName: string;
     centerName: string;
@@ -24,10 +25,11 @@ export type LlmPayload = {
   instructions: string;
 };
 
-export function buildLlmPayload(kind: DraftKind, facts: VerifiedFacts, baseDraft: string): LlmPayload {
+export function buildLlmPayload(kind: DraftKind, facts: VerifiedFacts, baseDraft: string, locale: DraftLocale = "en-US"): LlmPayload {
   return {
     task: "paraphrase_draft",
     kind,
+    locale,
     facts: {
       orgName: facts.orgName,
       centerName: facts.center.name,
@@ -47,7 +49,7 @@ export function buildLlmPayload(kind: DraftKind, facts: VerifiedFacts, baseDraft
     },
     baseDraft,
     instructions:
-      "Improve readability only. Do not add any fact, number, payer, timeframe, availability, testimonial, outcome or medical claim not present in facts. Keep all caveats.",
+      `Improve readability only. Do not add any fact, number, payer, timeframe, availability, testimonial, outcome or medical claim not present in facts. Keep all caveats.${locale === "en-US" ? "" : ` Write in ${locale}, keeping the base draft's language.`}`,
   };
 }
 
@@ -55,22 +57,22 @@ export type DraftOutput = { title: string; bodyMd: string; generator: "template"
 
 export interface ContentDraftProvider {
   name: string;
-  generate(kind: DraftKind, facts: VerifiedFacts): Promise<DraftOutput>;
+  generate(kind: DraftKind, facts: VerifiedFacts, locale?: DraftLocale): Promise<DraftOutput>;
 }
 
 export const templateProvider: ContentDraftProvider = {
   name: "template",
-  async generate(kind, facts) {
-    return { ...renderDraft(kind, facts), generator: "template" };
+  async generate(kind, facts, locale = "en-US") {
+    return { ...renderDraft(kind, facts, locale), generator: "template" };
   },
 };
 
 export function createLlmProvider(cfg: { baseUrl: string; apiKey: string; model: string; fetchImpl?: typeof fetch }): ContentDraftProvider {
   return {
     name: "llm",
-    async generate(kind, facts) {
-      const base = renderDraft(kind, facts);
-      const payload = buildLlmPayload(kind, facts, base.bodyMd);
+    async generate(kind, facts, locale = "en-US") {
+      const base = renderDraft(kind, facts, locale);
+      const payload = buildLlmPayload(kind, facts, base.bodyMd, locale);
       try {
         const res = await (cfg.fetchImpl ?? fetch)(`${cfg.baseUrl.replace(/\/$/, "")}/chat/completions`, {
           method: "POST",

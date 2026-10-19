@@ -49,9 +49,9 @@ Typed Next.js route handlers in `apps/web/src/app/api/v1`. All handlers except `
 | `GET /equity?days=30..365&centerId=` | `equity:read` (admin, growth, ops) | equity audit: aggregate payer-group access rates with small-cell suppression — see below |
 | `GET/POST /partners` · `POST /partners/:id/referral-code` | `partner:read` / `partner:manage` | aggregate attribution only |
 | `GET /drafts` · `GET/PUT /drafts/:id` | `mission:read` / `draft:edit` | PUT `{bodyMd, title?, revision}` → re-validated |
-| `POST /drafts/generate` | `draft:generate` | `{missionId?, centerId?, partnerId?, kind, locale}`; mission must be approved |
+| `POST /drafts/generate` | `draft:generate` | `{missionId?, centerId?, partnerId?, kind, locale}`; `locale` is `en-US` (default) or `es-US`; mission must be approved. `es-US` templates are machine-authored (needs qualified human translator review before any real use) and start with a hidden HTML-comment note saying so; the claim validator checks English and Spanish prohibited phrasing on every draft |
 | `POST /drafts/:id/approve` | `draft:approve` | blocked while the validator reports unsupported claims |
-| `GET /drafts/:id/export?format=md\|html` | `draft:export` | approved only; local preview |
+| `GET /drafts/:id/export?format=md\|html` | `draft:export` | approved only; local preview. HTML is a standalone document with `<html lang>` set to the draft locale (also sent as `Content-Language`) |
 | `POST /drafts/:id/send` | any | **always `403 FEATURE_DISABLED`** (audited) |
 | `GET /sources` · `GET /audit` | `sources:read` / `audit:read` | |
 | `POST /demo/reset` | `demo:reset` (admin) | demo organizations only; `403 FEATURE_DISABLED` when `DEMO_RESET_ENABLED=false` |

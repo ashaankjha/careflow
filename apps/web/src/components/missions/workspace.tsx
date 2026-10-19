@@ -1,5 +1,6 @@
 "use client";
 import { MISSION_RULES } from "@careflow/core/missions";
+import { DRAFT_LOCALE_LABELS, DRAFT_LOCALES, type DraftLocale } from "@careflow/core/schemas";
 import { CheckCircle2, FileText, FlaskConical, Gauge, ShieldAlert, Sparkles, XCircle } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -57,6 +58,7 @@ export function MissionsWorkspace({ missions, partners, perms, tz }: { missions:
   const [expMission, setExpMission] = useState<Mission | null>(null);
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [partnerFor, setPartnerFor] = useState<Record<string, string>>({});
+  const [localeFor, setLocaleFor] = useState<Record<string, DraftLocale>>({});
 
   async function run(key: string, fn: () => Promise<unknown>, ok: string | ((r: unknown) => string)) {
     setBusy(key);
@@ -182,10 +184,17 @@ export function MissionsWorkspace({ missions, partners, perms, tz }: { missions:
                               {partners.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                             </Select>
                           )}
+                          <div className="mb-2">
+                            <Label htmlFor={`draft-locale-${m.id}`} className="text-[11.5px]">Draft language</Label>
+                            <Select id={`draft-locale-${m.id}`} className="h-8 text-[12.5px]" value={localeFor[m.id] ?? "en-US"} onChange={(e) => setLocaleFor({ ...localeFor, [m.id]: e.target.value as DraftLocale })} data-testid="draft-locale">
+                              {DRAFT_LOCALES.map((l) => <option key={l} value={l}>{DRAFT_LOCALE_LABELS[l]}</option>)}
+                            </Select>
+                            {localeFor[m.id] === "es-US" && <p className="mt-1 rounded border border-warn/30 bg-warn-soft px-2 py-1 text-[11.5px] text-warn" data-testid="draft-locale-note">Spanish templates are machine-authored. A qualified human translator must review them before any real use.</p>}
+                          </div>
                           <div className="flex flex-wrap gap-1.5">
                             {m.draftKinds.map((k) => (
                               <Button key={k} size="sm" loading={busy === `d-${m.id}-${k}`} data-testid={`generate-draft-${k}`} onClick={async () => {
-                                const d = (await run(`d-${m.id}-${k}`, () => api<{ id: string }>("/drafts/generate", { body: { missionId: m.id, kind: k, partnerId: partnerFor[m.id] || null } }), `${DRAFT_LABEL[k]} drafted from verified records`)) as { id: string } | undefined;
+                                const d = (await run(`d-${m.id}-${k}`, () => api<{ id: string }>("/drafts/generate", { body: { missionId: m.id, kind: k, partnerId: partnerFor[m.id] || null, locale: localeFor[m.id] ?? "en-US" } }), `${DRAFT_LABEL[k]} drafted from verified records`)) as { id: string } | undefined;
                                 if (d?.id) setDraftId(d.id);
                               }}><FileText className="h-3.5 w-3.5" />{DRAFT_LABEL[k]}</Button>
                             ))}

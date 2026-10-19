@@ -210,3 +210,44 @@ test("9. equity audit tab shows suppressed, aggregate-only payer-group rates", a
   await expect(page.getByTestId("experiment-item").first()).toBeVisible();
   await expect(page.getByTestId("tab-equity")).toHaveCount(0);
 });
+
+test("10. generate and approve a Spanish (es-US) referral packet; print page sets lang", async ({ page }) => {
+  await loginAs(page, "admin");
+  await page.goto("/capacity");
+  await page.getByTestId("edit-capacity-west").click();
+  await page.getByTestId("hours-RBT-1-780").fill("6");
+  await page.getByTestId("save-capacity").click();
+  await expect(page.getByTestId("card-verified-hours-west")).toHaveText("46");
+  await page.goto("/missions");
+  await page.getByTestId("generate-missions").click();
+  const m2 = page.getByTestId("mission-M2-west");
+  await m2.getByTestId("approve-mission").click();
+  await expect(m2).toHaveAttribute("data-status", "approved");
+  // defaults to English; Spanish is flagged as machine-authored
+  await expect(m2.getByTestId("draft-locale")).toHaveValue("en-US");
+  await m2.getByTestId("draft-locale").selectOption("es-US");
+  await expect(m2.getByTestId("draft-locale-note")).toContainText("qualified human translator");
+  await m2.getByTestId("generate-draft-partner_packet").click();
+  await expect(page.getByTestId("draft-locale-badge")).toHaveText("Spanish (es-US)");
+  await expect(page.getByTestId("draft-translation-note")).toContainText("Machine-authored Spanish template");
+  await expect(page.getByTestId("draft-validation")).toContainText("traces to verified records");
+  const preview = page.locator(".prose-draft");
+  await expect(preview).toHaveAttribute("lang", "es-US");
+  await expect(preview).toContainText("Información de referidos para socios profesionales");
+  await expect(preview).toContainText("Meridian Medicaid Plan (DEMO) — participación verificada por el personal");
+  await expect(preview).toContainText("sujeta a verificación");
+  await expect(preview).not.toContainText("Pinecrest");
+  await page.getByTestId("approve-draft").click();
+  await expect(page.getByTestId("draft-status")).toHaveText("Approved");
+  await expect(page.getByRole("button", { name: /Send \(disabled\)/ })).toBeDisabled();
+  await shot(page, "10a-spanish-packet");
+  const href = await page.getByTestId("print-packet").getAttribute("href");
+  await page.goto(href!);
+  await expect(page.getByTestId("packet-body")).toHaveAttribute("lang", "es-US");
+  await expect(page.getByTestId("packet-body")).toContainText("No ofrecemos regalos, pagos ni nada de valor");
+  await expect(page.getByTestId("packet-translation-note")).toBeVisible();
+  const exported = await page.request.get(`/api/v1/drafts/${href!.split("/").pop()}/export?format=html`);
+  expect(exported.status()).toBe(200);
+  expect(await exported.text()).toContain('<html lang="es-US">');
+  await shot(page, "10b-spanish-packet-print");
+});

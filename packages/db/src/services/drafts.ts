@@ -1,5 +1,5 @@
 import { contentProviderFromEnv, disabledDeliveryProvider, FeatureDisabled, type ContentDraftProvider } from "@careflow/connectors";
-import { DRAFT_KINDS, haversineMiles, markdownToHtml, resolvePolicy, validateDraft, type DraftKind, type ServiceMode, type VerifiedFacts } from "@careflow/core";
+import { DRAFT_KINDS, DRAFT_LOCALES, haversineMiles, markdownToHtml, resolvePolicy, validateDraft, type DraftKind, type ServiceMode, type VerifiedFacts } from "@careflow/core";
 import { and, asc, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import type { Db, Executor } from "../client";
@@ -14,7 +14,7 @@ export const generateDraftSchema = z.object({
   centerId: z.string().uuid().optional(),
   partnerId: z.string().uuid().nullable().optional(),
   kind: z.enum(DRAFT_KINDS),
-  locale: z.enum(["en-US"]).default("en-US"),
+  locale: z.enum(DRAFT_LOCALES).default("en-US"),
 });
 
 export const updateDraftSchema = z.object({
@@ -120,7 +120,7 @@ export async function generateDraft(db: Db, ctx: Ctx, input: z.input<typeof gene
   }
   if (!centerId) throw new AppError("VALIDATION_FAILED", "centerId or missionId required");
   const facts = await buildVerifiedFacts(db, ctx, centerId, { missionId: data.missionId, partnerId: data.partnerId });
-  const out = await provider.generate(data.kind as DraftKind, facts);
+  const out = await provider.generate(data.kind as DraftKind, facts, data.locale);
   const validation = validateDraft(out.bodyMd, facts, data.kind);
   const [d] = await db
     .insert(contentDrafts)
@@ -140,7 +140,7 @@ export async function generateDraft(db: Db, ctx: Ctx, input: z.input<typeof gene
       factsSnapshotAt: nowOf(ctx),
     })
     .returning();
-  await audit(db, ctx, "draft.generate", "content_draft", d!.id, true, { kind: data.kind, generator: out.generator, validation: validation.status });
+  await audit(db, ctx, "draft.generate", "content_draft", d!.id, true, { kind: data.kind, locale: data.locale, generator: out.generator, validation: validation.status });
   return d!;
 }
 
@@ -160,6 +160,7 @@ export async function listDrafts(db: Executor, ctx: Ctx) {
       centerId: contentDrafts.centerId,
       partnerId: contentDrafts.partnerId,
       kind: contentDrafts.kind,
+      locale: contentDrafts.locale,
       title: contentDrafts.title,
       approvalStatus: contentDrafts.approvalStatus,
       revision: contentDrafts.revision,

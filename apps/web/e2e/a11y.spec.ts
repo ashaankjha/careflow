@@ -127,3 +127,32 @@ test("inquiry drawer with a reserved capacity hold", async ({ page }) => {
   await expect(page.getByTestId("holds").getByTestId("hold-reserved")).toBeVisible();
   await expectAccessible(page, "drawer with reserved hold");
 });
+
+test("Spanish (es-US) draft editor, packet print page and HTML export", async ({ page }) => {
+  await reseed();
+  await loginAs(page, "admin");
+  await page.goto("/capacity");
+  await page.getByTestId("edit-capacity-west").click();
+  await page.getByTestId("hours-RBT-1-780").fill("6");
+  await page.getByTestId("save-capacity").click();
+  await expect(page.getByTestId("card-verified-hours-west")).toHaveText("46");
+  await page.goto("/missions");
+  await page.getByTestId("generate-missions").click();
+  const m2 = page.getByTestId("mission-M2-west");
+  await m2.getByTestId("approve-mission").click();
+  await expect(m2).toHaveAttribute("data-status", "approved");
+  await m2.getByTestId("draft-locale").selectOption("es-US");
+  await expectAccessible(page, "missions with Spanish locale selected");
+  await m2.getByTestId("generate-draft-partner_packet").click();
+  await expect(page.locator(".prose-draft")).toHaveAttribute("lang", "es-US");
+  await expectAccessible(page, "Spanish draft editor");
+  await page.getByTestId("approve-draft").click();
+  await expect(page.getByTestId("draft-status")).toHaveText("Approved");
+  const href = await page.getByTestId("print-packet").getAttribute("href");
+  await page.goto(href!);
+  await expect(page.getByTestId("packet-body")).toHaveAttribute("lang", "es-US");
+  await expectAccessible(page, "Spanish packet print page");
+  await page.goto(`/api/v1/drafts/${href!.split("/").pop()}/export?format=html`);
+  await expect(page.locator("html")).toHaveAttribute("lang", "es-US");
+  await expectAccessible(page, "Spanish HTML export");
+});
