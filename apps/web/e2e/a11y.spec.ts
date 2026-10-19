@@ -101,3 +101,29 @@ test("capacity editor, mission draft editor and packet print page", async ({ pag
   await expect(page.locator(".prose-draft")).toBeVisible();
   await expectAccessible(page, "packet print page");
 });
+
+test("experiments equity audit tab", async ({ page }) => {
+  await loginAs(page, "ops");
+  await page.goto("/experiments");
+  await page.getByTestId("tab-equity").click();
+  await expect(page.getByTestId("equity-table")).toBeVisible();
+  await expectAccessible(page, "equity audit");
+});
+
+test("inquiry drawer with a reserved capacity hold", async ({ page }) => {
+  const alias = `Demo Family Axe${Date.now() % 1000}`;
+  await loginAs(page, "intake");
+  await page.goto("/intake");
+  await page.getByTestId("add-inquiry").click();
+  await page.getByLabel("Demo alias").fill(alias);
+  await page.getByLabel("Service ZCTA (study area)").selectOption("00111");
+  await page.getByLabel("Payer (as reported)").selectOption({ label: "Cascade Commercial (DEMO)" });
+  await page.getByTestId("synthetic-ack").check();
+  await page.getByTestId("submit-inquiry").click();
+  await expect(page.getByTestId("match-results")).toBeVisible();
+  await page.goto(`/intake?q=${encodeURIComponent(alias)}`);
+  await page.getByTestId("inquiry-row").first().click();
+  await page.getByTestId("match-south").getByTestId("reserve-hold").click();
+  await expect(page.getByTestId("holds").getByTestId("hold-reserved")).toBeVisible();
+  await expectAccessible(page, "drawer with reserved hold");
+});
