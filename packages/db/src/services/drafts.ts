@@ -1,5 +1,5 @@
 import { contentProviderFromEnv, disabledDeliveryProvider, FeatureDisabled, type ContentDraftProvider } from "@careflow/connectors";
-import { DRAFT_KINDS, haversineMiles, resolvePolicy, validateDraft, type DraftKind, type ServiceMode, type VerifiedFacts } from "@careflow/core";
+import { DRAFT_KINDS, haversineMiles, markdownToHtml, resolvePolicy, validateDraft, type DraftKind, type ServiceMode, type VerifiedFacts } from "@careflow/core";
 import { and, asc, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import type { Db, Executor } from "../client";
@@ -121,7 +121,7 @@ export async function generateDraft(db: Db, ctx: Ctx, input: z.input<typeof gene
   if (!centerId) throw new AppError("VALIDATION_FAILED", "centerId or missionId required");
   const facts = await buildVerifiedFacts(db, ctx, centerId, { missionId: data.missionId, partnerId: data.partnerId });
   const out = await provider.generate(data.kind as DraftKind, facts);
-  const validation = validateDraft(out.bodyMd, facts);
+  const validation = validateDraft(out.bodyMd, facts, data.kind);
   const [d] = await db
     .insert(contentDrafts)
     .values({
@@ -178,7 +178,7 @@ export async function updateDraft(db: Db, ctx: Ctx, id: string, input: z.input<t
   const d = await getDraft(db, ctx, id);
   if (d.revision !== data.revision) throw new AppError("CONFLICT", "Draft was edited by someone else — reload");
   const facts = await buildVerifiedFacts(db, ctx, d.centerId, { missionId: d.missionId, partnerId: d.partnerId });
-  const validation = validateDraft(data.bodyMd, facts);
+  const validation = validateDraft(data.bodyMd, facts, d.kind);
   const [u] = await db
     .update(contentDrafts)
     .set({
@@ -204,7 +204,7 @@ export async function approveDraft(db: Db, ctx: Ctx, id: string) {
   const d = await getDraft(db, ctx, id);
   if (d.approvalStatus === "approved") return d;
   const facts = await buildVerifiedFacts(db, ctx, d.centerId, { missionId: d.missionId, partnerId: d.partnerId });
-  const validation = validateDraft(d.bodyMd, facts);
+  const validation = validateDraft(d.bodyMd, facts, d.kind);
   if (validation.status !== "pass") {
     await db.update(contentDrafts).set({ validation, approvalStatus: "needs_review", updatedAt: nowOf(ctx) }).where(eq(contentDrafts.id, d.id));
     throw new AppError("VALIDATION_FAILED", "Draft contains claims that are not supported by verified records", validation);
@@ -241,60 +241,4 @@ export async function sendDraft(db: Executor, ctx: Ctx, id: string): Promise<nev
   }
 }
 
-/** Minimal, escaping Markdown → HTML for local preview (headings, lists, bold, code, paragraphs). */
-export function markdownToHtml(md: string): string {
-  const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  const inline = (s: string) =>
-    esc(s)
-      .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-      .replace(/_(.+?)_/g, "<em>$1</em>")
-      .replace(/`([^`]+)`/g, "<code>$1</code>");
-  const out: string[] = [];
-  let inList: "ul" | "ol" | null = null;
-  let inCode = false;
-  const closeList = () => {
-    if (inList) out.push(`</${inList}>`);
-    inList = null;
-  };
-  for (const line of md.split("\n")) {
-    if (line.startsWith("```")) {
-      closeList();
-      out.push(inCode ? "</code></pre>" : "<pre><code>");
-      inCode = !inCode;
-      continue;
-    }
-    if (inCode) {
-      out.push(esc(line));
-      continue;
-    }
-    if (/^<!--.*-->$/.test(line.trim())) continue;
-    const h = /^(#{1,3})\s+(.*)$/.exec(line);
-    const li = /^\s*[-*]\s+(?:\[( |x)\]\s+)?(.*)$/.exec(line);
-    const oli = /^\s*\d+\.\s+(.*)$/.exec(line);
-    if (h) {
-      closeList();
-      out.push(`<h${h[1]!.length}>${inline(h[2]!)}</h${h[1]!.length}>`);
-    } else if (li) {
-      if (inList !== "ul") {
-        closeList();
-        out.push("<ul>");
-        inList = "ul";
-      }
-      out.push(`<li>${li[1] !== undefined ? (li[1] === "x" ? "☑ " : "☐ ") : ""}${inline(li[2]!)}</li>`);
-    } else if (oli) {
-      if (inList !== "ol") {
-        closeList();
-        out.push("<ol>");
-        inList = "ol";
-      }
-      out.push(`<li>${inline(oli[1]!)}</li>`);
-    } else if (line.trim() === "") {
-      closeList();
-    } else {
-      closeList();
-      out.push(`<p>${inline(line)}</p>`);
-    }
-  }
-  closeList();
-  return out.join("\n");
-}
+export { markdownToHtml };

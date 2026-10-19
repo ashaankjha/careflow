@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html { -webkit-font-smoothing: antialiased; }
+  body { @apply bg-canvas text-ink; font-feature-settings: "cv11", "ss01"; }
+  :focus-visible { @apply outline-none ring-2 ring-accent ring-offset-2 ring-offset-canvas; }
+  ::selection { @apply bg-accent-soft; }
+}
+
+@layer components {
+  .tabular { font-variant-numeric: tabular-nums; }
+  .eyebrow { @apply text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-3; }
+  .prose-draft h1 { @apply mb-3 text-xl font-semibold; }
+  .prose-draft h2 { @apply mb-2 mt-5 text-base font-semibold; }
+  .prose-draft h3 { @apply mb-1 mt-4 text-sm font-semibold; }
+  .prose-draft p { @apply my-2 text-sm leading-6 text-ink-2; }
+  .prose-draft ul { @apply my-2 list-disc pl-5 text-sm leading-6 text-ink-2; }
+  .prose-draft ol { @apply my-2 list-decimal pl-5 text-sm leading-6 text-ink-2; }
+  .prose-draft pre { @apply my-3 overflow-x-auto rounded-md bg-canvas p-3 text-xs; }
+  .prose-draft code { @apply rounded bg-canvas px-1 text-[12px]; }
+}
+
+@media print {
+  .no-print { display: none !important; }
+  body { background: white; }
+}

@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "./schema";
@@ -28,4 +29,13 @@ export function databaseUrl(): string {
 export function getDb(): Db {
   if (!globalForDb.__careflowDb) globalForDb.__careflowDb = createDb(databaseUrl());
   return globalForDb.__careflowDb.db;
+}
+
+export async function pingDb(db: Db = getDb()): Promise<boolean> {
+  try {
+    await db.execute(sql`select 1`);
+    return true;
+  } catch {
+    return false;
+  }
 }

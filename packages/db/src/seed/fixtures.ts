@@ -164,7 +164,7 @@ export const CAPACITY_RULES: Record<string, { payer: string | null; ratio: numbe
   north: [{ payer: null, ratio: 0.1, minRbt: 1, maxNew: 4, verified: true }],
   west: [{ payer: null, ratio: 0.1, minRbt: 1, maxNew: 4, verified: true }],
   south: [
-    { payer: null, ratio: 0.1, minRbt: 1, maxNew: 6, verified: true },
+    { payer: null, ratio: 0.1, minRbt: 1, maxNew: 8, verified: true },
     { payer: "pinecrest", ratio: 0.125, minRbt: 1, maxNew: null, verified: true },
   ],
 };

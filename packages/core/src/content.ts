@@ -213,7 +213,8 @@ const BANNED: [RegExp, string][] = [
 ];
 
 /** Validate every payer, location, capacity and timeframe claim against verified records. */
-export function validateDraft(bodyMd: string, f: VerifiedFacts): ValidationResult {
+export function validateDraft(bodyMd: string, f: VerifiedFacts, kind?: DraftKind): ValidationResult {
+  const internal = kind === "internal_plan"; // internal plans may cite capacity/timeframes; never shared externally
   const issues: ValidationIssue[] = [];
   const text = bodyMd.replace(/```[\s\S]*?```/g, ""); // structured data block checked separately
   for (const [re, msg] of BANNED) {
@@ -229,10 +230,10 @@ export function validateDraft(bodyMd: string, f: VerifiedFacts): ValidationResul
   for (const m of text.matchAll(/\b\d{5}\b/g)) {
     if (!zips.has(m[0])) issues.push({ severity: "warning", message: `ZIP/ZCTA ${m[0]} is not in the verified service area`, excerpt: m[0] });
   }
-  for (const m of text.matchAll(/\b(?:within|in)\s+\d+\s+(?:business\s+)?(?:days?|weeks?|hours?)\b/gi)) {
+  for (const m of internal ? [] : text.matchAll(/\b(?:within|in)\s+\d+\s+(?:business\s+)?(?:days?|weeks?|hours?)\b/gi)) {
     issues.push({ severity: "error", message: "Timeframe claim cannot be verified", excerpt: m[0] });
   }
-  for (const m of text.matchAll(/\b(\d+(?:\.\d+)?)\s*(?:open|available)\s+(?:hours|slots|spots)\b/gi)) {
+  for (const m of internal ? [] : text.matchAll(/\b(\d+(?:\.\d+)?)\s*(?:open|available)\s+(?:hours|slots|spots)\b/gi)) {
     issues.push({ severity: "error", message: "Capacity claims must not be published externally", excerpt: m[0] });
   }
   if (!f.verifiedPayers.length && /verified by staff/i.test(text)) {

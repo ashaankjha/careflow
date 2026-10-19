@@ -1,0 +1,57 @@
+export const METRIC_DEFS: Record<string, { label: string; definition: string; numerator: string; denominator: string; caveat?: string }> = {
+  care_starts: {
+    label: "Verified care starts",
+    definition: "Distinct inquiries whose first care_started_verified_by_staff event falls in the window.",
+    numerator: "Distinct inquiries with a first verified start in window",
+    denominator: "— (count)",
+    caveat: "Staff-verified administrative event; repeated transitions are never double-counted.",
+  },
+  cohort_start_rate: {
+    label: "Care-start rate (cohort)",
+    definition: "Share of the inquiry creation cohort (created in window) with a verified start by the reporting cutoff.",
+    numerator: "Cohort inquiries with a verified start by cutoff",
+    denominator: "Inquiries created in window",
+    caveat: "Young cohorts are right-censored: recent inquiries have not had time to start.",
+  },
+  median_first_response_hours: {
+    label: "Median time to first outreach",
+    definition: "Median hours from inquiry creation to the first outreach_attempted event, among inquiries with outreach.",
+    numerator: "Inquiries with outreach",
+    denominator: "Inquiries created in window",
+    caveat: "Unanswered inquiries are shown separately, never silently dropped.",
+  },
+  median_days_to_start: {
+    label: "Median inquiry-to-start",
+    definition: "Median days from inquiry creation to verified care start, among starts in window.",
+    numerator: "Observations (starts in window)",
+    denominator: "—",
+  },
+  capacity_fit_rate: {
+    label: "Capacity-fit inquiries",
+    definition: "Cohort inquiries with at least one verified potential-fit site, evaluated against the current verified capacity snapshot.",
+    numerator: "Inquiries with ≥1 verified potential fit",
+    denominator: "Cohort inquiries with required inputs (ZIP in study area, payer, mode, time windows)",
+    caveat: "Missing-input inquiries are reported separately. A potential fit is not eligibility or an appointment.",
+  },
+  unresolved_stalls: {
+    label: "Unresolved intake stalls",
+    definition: "Active inquiries whose time in the current stage exceeds the configured threshold for that stage.",
+    numerator: "Active inquiries over threshold",
+    denominator: "Active inquiries",
+    caveat: "Current snapshot; thresholds are tenant settings.",
+  },
+  verified_weekly_direct_hours_available: {
+    label: "Verified direct h/wk for new starts",
+    definition: "Verified RBT hours minus proposed/reserved holds, capped by verified BCBA supervision and the weekly new-start limit.",
+    numerator: "Hours",
+    denominator: "—",
+    caveat: "Unverified or stale hours are never counted.",
+  },
+  referral_source_attribution: {
+    label: "Referral attribution",
+    definition: "First-party partner/campaign codes recorded at inquiry creation, with an explicit unattributed bucket.",
+    numerator: "Inquiries / starts per code",
+    denominator: "All inquiries in window",
+    caveat: "Single-touch, first-party only. Not incremental or multi-touch attribution.",
+  },
+};

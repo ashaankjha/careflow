@@ -109,6 +109,8 @@ export function simulateInquiries(now: Date, seed = 20261019): { inquiries: SimI
       const created = new Date(now.getTime() - daysAgo * DAY);
       created.setUTCHours(15 + rng.int(0, 9), rng.int(0, 59), 0, 0);
       if (created.getTime() > now.getTime() - HOUR) created.setTime(now.getTime() - 2 * HOUR - rng.int(0, 600) * 60_000);
+      // A few very recent inquiries so the intake queue has uncontacted work (no extra RNG draws: keeps the story stable).
+      if (i % 13 === 5) created.setTime(now.getTime() - (3 + (i % 9)) * HOUR);
 
       const payerKey = rng.weighted(prof.payers);
       const mode = rng.weighted(prof.modes);
