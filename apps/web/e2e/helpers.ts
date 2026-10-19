@@ -9,7 +9,7 @@ export async function loginAs(page: Page, who: "admin" | "growth" | "ops" | "int
   await page.goto("/login");
   await page.getByTestId(`login-as-${who}`).click();
   await page.waitForURL((u) => !u.pathname.startsWith("/login"));
-  await expect(page.getByTestId("current-user")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
 }
 
 export async function shot(page: Page, name: string) {

@@ -111,8 +111,8 @@ export function MissionsWorkspace({ missions, partners, perms, tz }: { missions:
           const active = m.status === "approved" || m.status === "in_progress";
           return (
             <Card key={m.id} id={m.id} className="scroll-mt-24 overflow-hidden" data-testid={`mission-${m.ruleId}-${(m.centerName ?? "org").split(" ")[0]!.toLowerCase()}`} data-status={m.status}>
-              <div className="grid gap-0 lg:grid-cols-[1fr_300px]">
-                <div className="p-5">
+              <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_300px]">
+                <div className="min-w-0 p-5">
                   <div className="flex flex-wrap items-center gap-1.5">
                     <Badge tone="ink">{m.ruleId}</Badge>
                     <Badge tone="outline">{m.category}</Badge>
@@ -121,7 +121,7 @@ export function MissionsWorkspace({ missions, partners, perms, tz }: { missions:
                     {m.requiresOpsReview && <Badge tone="warn"><ShieldAlert className="h-3 w-3" />Ops sign-off required</Badge>}
                     {m.increasesDemand && <Tip content="Only generated when the site has verified, unsaturated capacity; re-checked at approval."><Badge tone="blue">Demand-increasing · capacity-gated</Badge></Tip>}
                   </div>
-                  <h3 className="mt-2.5 text-[16px] font-semibold leading-6">{m.title}</h3>
+                  <h3 className="mt-2.5 break-words text-[16px] font-semibold leading-6">{m.title}</h3>
                   <p className="mt-1 text-[13px] leading-6 text-ink-2">{m.explanation}</p>
                   <div className="mt-3 grid gap-3 md:grid-cols-2">
                     <div className="rounded-lg bg-canvas p-3"><div className="eyebrow mb-1">Proposed action</div><p className="text-[12.5px] leading-5 text-ink-2">{m.proposedAction}</p></div>
@@ -136,7 +136,7 @@ export function MissionsWorkspace({ missions, partners, perms, tz }: { missions:
                             <td className="py-1.5 pr-3 text-ink-2">{e.label}</td>
                             <td className="py-1.5 pr-3 font-semibold tabular">{e.numerator}{e.denominator != null ? <span className="font-normal text-ink-3"> / {e.denominator}</span> : null}</td>
                             <td className="py-1.5 pr-3 text-ink-3">{e.timeRange}</td>
-                            <td className="py-1.5 text-right font-mono text-[11px] text-ink-4">{e.metricKey}</td>
+                            <td className="hidden py-1.5 text-right font-mono text-[11px] text-ink-4 sm:table-cell">{e.metricKey}</td>
                           </tr>
                         ))}
                       </tbody>

@@ -10,5 +10,8 @@ test("mobile: navigation menu and overview are usable", async ({ page }) => {
   await page.getByRole("button", { name: "Open menu" }).click();
   await page.getByRole("link", { name: "Growth Missions" }).click();
   await expect(page.getByRole("heading", { name: "Growth missions" })).toBeVisible();
+  // no mission card content is clipped horizontally
+  const clipped = await page.locator('[data-testid^="mission-"][data-status]').evaluateAll((els) => els.filter((e) => e.scrollWidth > e.clientWidth + 1).length);
+  expect(clipped).toBe(0);
   await shot(page, "mobile-missions");
 });
