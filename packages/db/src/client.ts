@@ -19,19 +19,38 @@ export function createDb(url: string, opts: { max?: number } = {}) {
   return { db, client };
 }
 
-const globalForDb = globalThis as unknown as { __careflowDb?: ReturnType<typeof createDb> };
+const globalForDb = globalThis as unknown as { __careflowDb?: ReturnType<typeof createDb>; __careflowAppDb?: ReturnType<typeof createDb> };
 
+/**
+ * Owner / migration URL (superuser or BYPASSRLS + table owner). Used by
+ * migrations, `db:seed`, `db:reset`, the jobs CLI and the demo-reset purge path.
+ */
 export function databaseUrl(): string {
   return process.env.DATABASE_URL ?? "postgres://postgres:postgres@localhost:5432/careflow";
 }
 
-/** Process-wide pooled client (survives Next.js dev HMR). */
+/**
+ * Least-privilege application URL: role `careflow_app` (no ownership, no
+ * BYPASSRLS). The web app uses only this for request traffic, so the FORCEd
+ * RLS policies always apply. The default password is a dev-only value.
+ */
+export function appDatabaseUrl(): string {
+  return process.env.APP_DATABASE_URL ?? "postgres://careflow_app:careflow_app_dev_only@localhost:5432/careflow";
+}
+
+/** Process-wide pooled OWNER client (survives Next.js dev HMR). Not for request traffic. */
 export function getDb(): Db {
   if (!globalForDb.__careflowDb) globalForDb.__careflowDb = createDb(databaseUrl());
   return globalForDb.__careflowDb.db;
 }
 
-export async function pingDb(db: Db = getDb()): Promise<boolean> {
+/** Process-wide pooled APP-ROLE client. Queries only see rows once `withOrg` sets the tenant. */
+export function getAppDb(): Db {
+  if (!globalForDb.__careflowAppDb) globalForDb.__careflowAppDb = createDb(appDatabaseUrl());
+  return globalForDb.__careflowAppDb.db;
+}
+
+export async function pingDb(db: Db = getAppDb()): Promise<boolean> {
   try {
     await db.execute(sql`select 1`);
     return true;

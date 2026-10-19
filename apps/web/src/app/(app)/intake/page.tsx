@@ -1,6 +1,6 @@
 import { listCenters, listInquiries, listIntakeOwners, listPayers, marketZctas } from "@careflow/db";
 import { can } from "@careflow/core";
-import { db } from "@/lib/server/db";
+import { db, withOrg } from "@/lib/server/db";
 import { requireSession } from "@/lib/server/session";
 import { PageHeader } from "@/components/ui/misc";
 import { SyntheticBadge } from "@/components/ui/badge";
@@ -20,14 +20,14 @@ export default async function IntakePage({ searchParams }: { searchParams: Promi
     page: Number(sp.page ?? 1) || 1,
     pageSize: 25,
   };
-  const [list, board, centers, payers, owners, market] = await Promise.all([
+  const [list, board, centers, payers, owners, market] = await withOrg(s.ctx, () => Promise.all([
     listInquiries(db(), s.ctx, filters),
     listInquiries(db(), s.ctx, { ...filters, page: 1, pageSize: 200, stage: filters.stage ?? "active" }),
     listCenters(db(), s.ctx),
     listPayers(db(), s.ctx),
     listIntakeOwners(db(), s.ctx),
     marketZctas(db(), s.ctx),
-  ]);
+  ]));
   return (
     <>
       <PageHeader

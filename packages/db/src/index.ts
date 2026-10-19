@@ -1,6 +1,9 @@
 export * from "./client";
+export { sql } from "drizzle-orm";
 export * as schema from "./schema";
 export * from "./services";
+export { hitRateLimit } from "./services/rate-limit";
+export { withOrg, setTenant } from "./tenant";
 export { seedDatabase, seedNow, DEMO_ORG_IDS } from "./seed";
 export { HARBOR, LAKESIDE, USERS, DEMO_PASSWORD, centerId, payerId, partnerId, userId } from "./seed/fixtures";
 export { hashPassword, verifyPassword } from "./auth";

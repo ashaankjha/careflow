@@ -48,15 +48,16 @@ Three layers, from strongest to defense-in-depth:
 
 1. **Composite foreign keys** — child tables reference parents by `(organization_id, id)`, so a row can never point at another tenant’s center, payer, inquiry, mission, experiment or variant (tested: `tenancy.test.ts`).
 2. **Service-level scoping** — every query filters `organization_id = ctx.orgId`; lookups by UUID return `NOT_FOUND` for other tenants (tested by guessing UUIDs across Harbor ↔ Lakeside).
-3. **Row-level security** — `tenant_isolation` policies on all tenant tables keyed on `app.current_org`. The dev app connects as the table owner (which bypasses RLS); production must connect as a non-owner role and `set_config('app.current_org', …)` per transaction. A test proves the policies isolate a non-owner role.
+3. **Row-level security (enforced)** — `tenant_isolation` policies (all commands, `USING` + `WITH CHECK`) on every tenant table plus `organizations`, `users` and `sessions`, with `FORCE ROW LEVEL SECURITY`. The web app connects as the non-owner `careflow_app` role (`APP_DATABASE_URL`) and wraps every API request (`route()`) and server-component data load (`withOrg()`) in one transaction that runs `set_config('app.current_org', orgId, true)`; the setting is transaction-local, so pooled connections never carry a tenant forward, and with no tenant set every policy matches nothing. Session lookup / sign-in / logout happen before the tenant is known and use three narrow SECURITY DEFINER functions keyed on the email or SHA-256 token hash. Migrations, seed, reset and the jobs CLI use the owner role (`DATABASE_URL`, SUPERUSER/BYPASSRLS). Tested in `app-role.test.ts`.
 
 ```mermaid
 flowchart TB
-  S[session cookie] -->|sha256 lookup| SES[(sessions)] --> U[(users.organization_id)]
+  S[session cookie] -->|sha256 via careflow_resolve_session| SES[(sessions)] --> U[(users.organization_id)]
   U --> CTX[Ctx.orgId]
-  CTX --> Q[service queries: WHERE organization_id = Ctx.orgId]
+  CTX --> TX["app-role transaction: set_config('app.current_org')"]
+  TX --> Q[service queries: WHERE organization_id = Ctx.orgId]
   Q --> FK[composite FKs reject cross-tenant combos]
-  Q --> RLS[RLS policies when connected as non-owner]
+  Q --> RLS[FORCEd RLS policies on careflow_app]
 ```
 
 ## Event model

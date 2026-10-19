@@ -4,7 +4,7 @@ import { Badge, SyntheticBadge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/misc";
 import { DemoReset } from "@/components/settings/demo-reset";
-import { db } from "@/lib/server/db";
+import { db, withOrg } from "@/lib/server/db";
 import { requireSession } from "@/lib/server/session";
 import { fmtDateTime, titleCase } from "@/lib/format";
 import { METRIC_DEFS } from "@/lib/metric-defs";
@@ -24,13 +24,13 @@ const INTEGRATIONS = [
 export default async function SettingsPage() {
   const s = await requireSession();
   const role = s.user.role;
-  const [policy, centers, users, sources, audit] = await Promise.all([
+  const [policy, centers, users, sources, audit] = await withOrg(s.ctx, () => Promise.all([
     getPolicy(db(), s.ctx),
     listCenters(db(), s.ctx),
     listUsers(db(), s.ctx),
     listSources(db(), s.ctx),
     can(role, "audit:read") ? listAudit(db(), s.ctx, 60) : Promise.resolve(null),
-  ]);
+  ]));
   const tz = s.org.timezone;
   return (
     <>

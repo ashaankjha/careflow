@@ -3,7 +3,7 @@ import { listCenters, listExperiments } from "@careflow/db";
 import { SyntheticBadge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/misc";
 import { ExperimentsWorkspace } from "@/components/experiments/workspace";
-import { db } from "@/lib/server/db";
+import { db, withOrg } from "@/lib/server/db";
 import { requireSession } from "@/lib/server/session";
 
 export const metadata = { title: "Experiments" };
@@ -11,7 +11,7 @@ export const metadata = { title: "Experiments" };
 export default async function ExperimentsPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const s = await requireSession();
   const sp = await searchParams;
-  const [exps, centers] = await Promise.all([listExperiments(db(), s.ctx), listCenters(db(), s.ctx)]);
+  const [exps, centers] = await withOrg(s.ctx, () => Promise.all([listExperiments(db(), s.ctx), listCenters(db(), s.ctx)]));
   return (
     <>
       <PageHeader

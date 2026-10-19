@@ -1,11 +1,13 @@
 import { createDb, databaseUrl } from "../client";
 import { loadEnv } from "../env";
 import { seedDatabase } from "../seed";
+import { assertMaintenanceRole } from "./migrate";
 
 loadEnv();
 const { db, client } = createDb(databaseUrl(), { max: 2 });
 const started = Date.now();
-seedDatabase(db)
+assertMaintenanceRole(db)
+  .then(() => seedDatabase(db))
   .then((r) => {
     console.info(
       `✓ ${process.argv.includes("--reset") ? "Demo reset to" : "Seeded"} exact synthetic state (anchor ${r.now}): ${r.inquiries} inquiries, ${r.events} events, ${r.missions} missions in ${Date.now() - started} ms`,

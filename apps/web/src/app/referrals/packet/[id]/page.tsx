@@ -1,7 +1,7 @@
 import { exportDraft, getDraft } from "@careflow/db";
 import { notFound } from "next/navigation";
 import QRCode from "qrcode";
-import { db } from "@/lib/server/db";
+import { db, withOrg } from "@/lib/server/db";
 import { requireSession } from "@/lib/server/session";
 import { PrintButton } from "./print-button";
 
@@ -11,12 +11,12 @@ export const metadata = { title: "Referral packet" };
 export default async function PacketPage({ params }: { params: Promise<{ id: string }> }) {
   const s = await requireSession();
   const { id } = await params;
-  const d = await getDraft(db(), s.ctx, id).catch(() => null);
+  const d = await withOrg(s.ctx, () => getDraft(db(), s.ctx, id)).catch(() => null);
   if (!d) notFound();
   if (d.approvalStatus !== "approved") {
     return <main className="mx-auto max-w-2xl p-10 text-sm">This packet is not approved yet. Approve it in Growth Missions before printing.</main>;
   }
-  const r = await exportDraft(db(), s.ctx, id, "html");
+  const r = await withOrg(s.ctx, () => exportDraft(db(), s.ctx, id, "html"));
   const code = /referral code \*\*([A-Z0-9]+)\*\*/.exec(d.bodyMd)?.[1];
   const qr = code ? await QRCode.toDataURL(`REF:${code}`, { margin: 1, width: 140 }) : null;
   return (

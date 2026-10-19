@@ -5,7 +5,8 @@ Typed Next.js route handlers in `apps/web/src/app/api/v1`. All handlers except `
 * **Auth** — HttpOnly `cf_session` cookie (random 256-bit token; only its SHA-256 is stored), `SameSite=Lax`, `Secure` in production, 8-hour expiry. Unauthenticated → `401 UNAUTHENTICATED`.
 * **CSRF** — mutations (`POST/PUT/PATCH/DELETE`) must be same-origin (`Origin` host = `Host`), and bodies must be `application/json` (which also means no file uploads).
 * **RBAC** — `action` is checked against the matrix in `packages/core/src/permissions.ts`; services re-check. Denials are audited.
-* **Rate limits** — per user: 60 mutations/min burst (1/s refill), 300 reads burst; login 10 per IP.
+* **Rate limits** — shared fixed 60-second windows stored in Postgres (`rate_limit_buckets`), so they hold across processes: per user 60 mutations/min and 300 reads/min; sign-in 20/min per client IP (first `X-Forwarded-For` hop). Exceeding → `429 RATE_LIMITED`.
+* **Tenancy** — after authentication the handler runs inside one transaction on the least-privilege `careflow_app` role with `app.current_org` set to the session’s organization, so Postgres RLS applies to every query (the handler also receives it as `db`).
 * **Validation** — Zod schemas from `@careflow/core`; failures → `422 VALIDATION_FAILED` with `details: [{path, message}]`.
 * **Idempotency** — creation and transitions take client-generated keys; replays return the original result (`replayed: true`).
 * **Errors** — `{ "error": { "code", "message", "requestId", "details?" } }`. Codes: `UNAUTHENTICATED 401`, `FORBIDDEN 403`, `FEATURE_DISABLED 403`, `DEMO_ONLY 403`, `NOT_FOUND 404`, `INVALID_TRANSITION 409`, `CONFLICT 409`, `VALIDATION_FAILED 422`, `RATE_LIMITED 429`, `INTERNAL 500`.
@@ -49,7 +50,7 @@ Typed Next.js route handlers in `apps/web/src/app/api/v1`. All handlers except `
 | `GET /drafts/:id/export?format=md\|html` | `draft:export` | approved only; local preview |
 | `POST /drafts/:id/send` | any | **always `403 FEATURE_DISABLED`** (audited) |
 | `GET /sources` · `GET /audit` | `sources:read` / `audit:read` | |
-| `POST /demo/reset` | `demo:reset` (admin) | demo organizations only |
+| `POST /demo/reset` | `demo:reset` (admin) | demo organizations only; `403 FEATURE_DISABLED` when `DEMO_RESET_ENABLED=false` |
 
 ## Example: `POST /matching/evaluate`
 

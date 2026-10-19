@@ -1,4 +1,8 @@
 # Local development database only. Synthetic demo data; not a HIPAA-eligible deployment.
+# Roles: POSTGRES_USER `postgres` is a superuser and is the owner/migration role (DATABASE_URL).
+# The least-privilege app role `careflow_app` (APP_DATABASE_URL) is NOT created here: `pnpm db:migrate`
+# creates it (migration 0002) and sets its LOGIN password from APP_DATABASE_URL. The image's default
+# pg_hba uses scram-sha-256 for TCP connections, which works for both roles.
 services:
   postgres:
     image: postgres:16-alpine

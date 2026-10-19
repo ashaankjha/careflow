@@ -610,3 +610,17 @@ export const consentRecords = pgTable("consent_records", {
   optedOutAt: ts("opted_out_at"),
   enabled: boolean("enabled").notNull().default(false),
 });
+
+/**
+ * Shared fixed-window rate-limit counters (migration 0002, UNLOGGED). Not tenant
+ * data and not under RLS: keys are "<userId>:<r|w>" or "login:<ip>".
+ */
+export const rateLimitBuckets = pgTable(
+  "rate_limit_buckets",
+  {
+    key: text("key").primaryKey(),
+    windowStart: ts("window_start").notNull(),
+    hits: integer("hits").notNull(),
+  },
+  (t) => [index("rate_limit_buckets_window_idx").on(t.windowStart)],
+);

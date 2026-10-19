@@ -24,8 +24,8 @@ This log records judgement calls made while implementing the PRD without routine
 
 ## Compromises
 
-* **RLS** policies exist and are tested with a non-owner role, but the app itself connects as the owner, so RLS is defense-in-depth rather than the primary control in this demo (see security gates R1).
-* **Rate limiting** is in-memory per process.
+* **Tenancy / RLS**: the web app connects as the non-owner `careflow_app` role and runs each API request and server-component data load in one transaction with `app.current_org` set; RLS is FORCEd on all tenant tables. Compromises: (a) sign-in and cookie resolution go through three SECURITY DEFINER functions (`careflow_auth_lookup`, `careflow_resolve_session`, `careflow_revoke_session`) because the tenant is unknown at that point; (b) *Settings → Reset demo* makes the web process use the owner `DATABASE_URL` for the cross-tenant purge + reseed (disable with `DEMO_RESET_ENABLED=false`); (c) several services are typed `Db` and receive the request transaction through a cast (a drizzle transaction exposes the same query API; nested `transaction()` calls become savepoints); (d) an `AppError` thrown inside the request transaction still commits earlier writes (keeps denial/send-attempt audits, matching the pre-RLS autocommit behaviour), other errors roll back; (e) the jobs CLI still runs as the owner role. The `careflow_app` role name is fixed in migration 0002.
+* **Rate limiting** is a shared fixed-window counter in Postgres (`rate_limit_buckets`, UNLOGGED, one upsert per request) — it holds across processes/nodes but costs one DB round-trip per request, resets counters on a DB crash, is not a substitute for an edge WAF, and keys by user id (API) or `X-Forwarded-For` first hop (sign-in), which is spoofable without a trusted proxy in front.
 * **CSP** allows inline scripts for Next.js bootstrapping (no third-party origins).
 * **Capacity history** is not versioned, so capacity-fit for past cohorts uses current capacity (documented in metric definitions).
 * **Experiment intervals** for partner/site-week randomization do not adjust for clustering (caveat shown).
