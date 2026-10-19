@@ -41,7 +41,7 @@ export type Mission = {
   draftKinds: string[];
   experimentTemplate: { hypothesis: string; primaryMetric: string; guardrails: string[]; assignmentUnit: string; designType: string };
   evidence: { id: string; metricKey: string; label: string; numerator: number; denominator: number | null; timeRange: string; eventCount: number; verifiedAt: string }[];
-  drafts: { id: string; kind: string; title: string; approvalStatus: string; revision: number }[];
+  drafts: { id: string; kind: string; title: string; approvalStatus: string; revision: number; locale: string }[];
   experiments: { id: string; name: string; status: string; designType: string }[];
 };
 
@@ -49,6 +49,18 @@ type Perms = { generate: boolean; approve: boolean; approveOps: boolean; status:
 
 const STATUS_TONE = { proposed: "blue", approved: "good", rejected: "neutral", in_progress: "teal", done: "ink" } as const;
 const DRAFT_LABEL: Record<string, string> = { partner_packet: "Referral packet", referral_email: "Partner email", seo_page: "Location page", internal_plan: "Internal plan" };
+const LOCALE_NAME: Record<string, string> = { "en-US": "English", "es-US": "Spanish" };
+
+/** Short visible code (EN / ES); screen readers get the full language name and tag. */
+function LocaleBadge({ locale }: { locale: string }) {
+  const label = `Language: ${LOCALE_NAME[locale] ?? locale} (${locale})`;
+  return (
+    <Badge tone="outline" className="px-1.5 font-mono text-[10px]" title={label} data-testid="draft-list-locale" data-locale={locale}>
+      <span aria-hidden="true">{locale.split("-")[0]!.toUpperCase()}</span>
+      <span className="sr-only">{label}</span>
+    </Badge>
+  );
+}
 
 export function MissionsWorkspace({ missions, partners, perms, tz }: { missions: Mission[]; partners: { id: string; name: string }[]; perms: Perms; tz: string }) {
   const router = useRouter();
@@ -207,7 +219,7 @@ export function MissionsWorkspace({ missions, partners, perms, tz }: { missions:
                             <li key={d.id}>
                               <button className="flex w-full items-center justify-between gap-2 rounded-md border border-line bg-surface px-2.5 py-1.5 text-left text-[12px] hover:border-accent/40" onClick={() => setDraftId(d.id)} data-testid={`draft-${d.kind}`}>
                                 <span className="truncate">{DRAFT_LABEL[d.kind]} · r{d.revision}</span>
-                                <Badge tone={d.approvalStatus === "approved" ? "good" : d.approvalStatus === "needs_review" ? "warn" : "neutral"}>{titleCase(d.approvalStatus)}</Badge>
+                                <span className="ml-auto flex shrink-0 items-center gap-1"><LocaleBadge locale={d.locale} /><Badge tone={d.approvalStatus === "approved" ? "good" : d.approvalStatus === "needs_review" ? "warn" : "neutral"}>{titleCase(d.approvalStatus)}</Badge></span>
                               </button>
                             </li>
                           ))}
