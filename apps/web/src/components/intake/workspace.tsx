@@ -1,5 +1,5 @@
 "use client";
-import { ACTIVE_STAGES, STAGE_LABELS, type Stage } from "@careflow/core/stages";
+import { STAGE_LABELS, type Stage } from "@careflow/core/stages";
 import { SOURCE_LABELS, type SourceChannel } from "@careflow/core/schemas";
 import { createColumnHelper, flexRender, getCoreRowModel, getSortedRowModel, useReactTable, type SortingState } from "@tanstack/react-table";
 import { AlertCircle, ArrowUpDown, ChevronLeft, ChevronRight, Download, FileUp, LayoutGrid, Plus, Search, Table2 } from "lucide-react";
@@ -15,6 +15,7 @@ import { fmtDate } from "@/lib/format";
 import { AddInquiryDialog } from "./add-inquiry";
 import { ImportDialog } from "./import-dialog";
 import { InquiryDrawer } from "./drawer";
+import { KanbanBoard } from "./kanban-board";
 
 export type InquiryRow = {
   id: string;
@@ -62,6 +63,7 @@ export function IntakeWorkspace(props: {
   const sp = useSearchParams();
   const [view, setView] = useState<"table" | "board">("table");
   const [openId, setOpenId] = useState<string | null>(props.initialInquiryId);
+  const [pendingStage, setPendingStage] = useState<Stage | null>(null);
   const [adding, setAdding] = useState(false);
   const [importing, setImporting] = useState(false);
   const [q, setQ] = useState(sp.get("q") ?? "");
@@ -202,34 +204,10 @@ export function IntakeWorkspace(props: {
           </div>
         </Card>
       ) : (
-        <div className="flex gap-3 overflow-x-auto pb-3" data-testid="kanban">
-          {[...ACTIVE_STAGES, "waitlisted" as const].map((stage) => {
-            const items = props.board.filter((i) => i.stage === stage);
-            return (
-              <div key={stage} className="w-64 shrink-0 rounded-xl border border-line bg-surface/60">
-                <div className="flex items-center justify-between border-b border-line px-3 py-2">
-                  <span className="text-[12.5px] font-semibold">{STAGE_LABELS[stage]}</span>
-                  <Badge tone="neutral">{items.length}</Badge>
-                </div>
-                <div className="max-h-[60vh] space-y-2 overflow-y-auto p-2">
-                  {items.map((i) => (
-                    <button key={i.id} onClick={() => setOpenId(i.id)} className="block w-full rounded-lg border border-line bg-surface p-2.5 text-left shadow-card hover:border-accent/40">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="truncate text-[12.5px] font-medium">{i.contactAlias}</span>
-                        {i.stalled && <Badge tone="warn">Stalled</Badge>}
-                      </div>
-                      <div className="mt-1 text-[11.5px] text-ink-3">{i.centerName ?? "Unrouted"} · {i.daysInStage} d in stage</div>
-                    </button>
-                  ))}
-                  {items.length === 0 && <div className="px-2 py-6 text-center text-[12px] text-ink-4">Empty</div>}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        <KanbanBoard rows={props.board} canTransition={props.perms.transition} onOpen={(id, stage) => { setOpenId(id); setPendingStage(stage ?? null); }} />
       )}
 
-      <InquiryDrawer id={openId} onClose={() => setOpenId(null)} perms={props.perms} owners={props.owners} centers={props.centers} tz={props.tz} />
+      <InquiryDrawer id={openId} pendingStage={pendingStage} onClose={() => { setOpenId(null); setPendingStage(null); }} perms={props.perms} owners={props.owners} centers={props.centers} tz={props.tz} />
       <AddInquiryDialog open={adding} onOpenChange={setAdding} payers={props.payers} centers={props.centers} zctas={props.zctas} onCreated={(id) => { setAdding(false); router.refresh(); setOpenId(id); }} />
       <ImportDialog open={importing} onOpenChange={setImporting} onDone={() => router.refresh()} />
     </div>

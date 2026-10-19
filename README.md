@@ -11,7 +11,7 @@ CareFlow connects intake funnel events, verified operational capacity, local mar
 | Capability | Where | Highlights |
 |---|---|---|
 | Multi-location growth dashboard | **Overview** | KPIs computed live from the immutable event log (care starts, cohort start rate, first-response, inquiry-to-start, capacity-fit as of inquiry time, stalls) — each with definition, numerator and denominator; site demand-vs-capacity matrix; trend; stage drop-off; attribution with an explicit *unattributed* bucket; provenance |
-| Intake funnel | **Intake Funnel** | Filterable table (TanStack) + Kanban, owner queues, stall flags, add simulated inquiry (PII guard), CSV preview/idempotent import, drawer with immutable timeline, quick stage transitions, outreach logging, site selection, match snapshots, aggregate-only CSV export |
+| Intake funnel | **Intake Funnel** | Filterable table (TanStack) + Kanban (drag a card or use its keyboard-accessible “Move to…” menu; only legal stage-machine moves accept a drop, reason-required moves open the drawer, errors roll back), owner queues, stall flags, add simulated inquiry (PII guard), CSV preview/idempotent import, drawer with immutable timeline, quick stage transitions, outreach logging, site selection, match snapshots, aggregate-only CSV export |
 | Capacity-aware matching | **Capacity & Matching** | Ops editors for payer status and staff windows (optimistic locking, attest-as-verified, every save versioned for as-of metrics), explainable hard gates (geography, payer, mode, age policy, RBT schedule, BCBA supervision, weekly start limit), soft score breakdown, `verification_needed` / `no_feasible_match` states, “Test a match” |
 | Capacity reservation holds | **Intake drawer** | Reserve a verified potential fit as a capacity hold in a row-locked transaction (concurrent reservations can never exceed verified hours or the weekly new-start limit), release, automatic expiry; holds are explicitly **not appointments** |
 | Geographic market intelligence | **Market Map** | Offline hex-tile choropleth (fictional geography), five layers, transparent opportunity heuristic with missing-component ranges, small-cell suppression, provenance panel, admin refresh with ACS connector and fixture fallback |
@@ -71,7 +71,7 @@ The login page has one-click persona buttons.
 | `pnpm jobs <name>` | Run a cron-compatible job manually: `compute-daily-metrics`, `generate-missions`, `expire-holds`, `refresh-market` |
 | `pnpm lint` · `pnpm typecheck` | ESLint (flat config) · strict TypeScript, all packages |
 | `pnpm test` | Vitest: core domain, connectors, DB integration (uses `TEST_DATABASE_URL`), API wrapper |
-| `pnpm test:e2e` | Playwright: production build, 7 demo workflows + capacity-hold reserve/release + equity audit + security (RBAC, nonce CSP) + keyboard + mobile + axe WCAG 2.1 A/AA scan of every screen; writes `docs/screenshots/` |
+| `pnpm test:e2e` | Playwright: production build, 7 demo workflows + capacity-hold reserve/release + equity audit + Kanban drag/drop + security (RBAC, nonce CSP) + keyboard + mobile + axe WCAG 2.1 A/AA scan of every screen; writes `docs/screenshots/` |
 
 `pnpm test` creates/migrates/reseeds `careflow_test` (it refuses any URL without “test” in it). `pnpm test:e2e` reseeds the main database first.
 

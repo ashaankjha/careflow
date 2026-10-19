@@ -210,3 +210,91 @@ test("9. equity audit tab shows suppressed, aggregate-only payer-group rates", a
   await expect(page.getByTestId("experiment-item").first()).toBeVisible();
   await expect(page.getByTestId("tab-equity")).toHaveCount(0);
 });
+
+test("10. Kanban: drag a card to a legal column, refuse an illegal drop, roll back server errors", async ({ page }) => {
+  const alias = `Demo Family Board${Date.now() % 1000}`;
+  await loginAs(page, "intake");
+  await page.goto("/intake");
+  await page.getByTestId("add-inquiry").click();
+  await page.getByLabel("Demo alias").fill(alias);
+  await page.getByTestId("synthetic-ack").check();
+  await page.getByTestId("submit-inquiry").click();
+  await expect(page.getByTestId("match-results")).toBeVisible();
+  await page.goto(`/intake?q=${encodeURIComponent(alias)}`);
+  await page.getByRole("button", { name: "Kanban" }).click();
+  const board = page.getByTestId("kanban");
+  const card = board.getByTestId("kanban-card").filter({ hasText: alias });
+  const col = (stage: string) => page.getByTestId(`kanban-col-${stage}`);
+  await expect(col("new").getByTestId("kanban-card")).toHaveCount(1);
+
+  // while dragging, only legal targets accept a drop
+  await card.hover();
+  await page.mouse.down();
+  await col("qualified").hover();
+  await col("contacted").hover();
+  await expect(col("contacted")).toHaveAttribute("data-drop", "legal");
+  await expect(col("waitlisted")).toHaveAttribute("data-drop", "legal");
+  await expect(col("qualified")).toHaveAttribute("data-drop", "illegal");
+  await expect(col("benefits_verified")).toHaveAttribute("data-drop", "illegal");
+  await page.mouse.up();
+  await expect(col("contacted")).not.toHaveAttribute("data-drop", /.*/);
+
+  // legal drop: same transition API as the drawer, recorded on the timeline
+  await card.dragTo(col("contacted"));
+  await expect(col("contacted").getByTestId("kanban-card")).toHaveCount(1);
+  await expect(card).toHaveAttribute("data-stage", "contacted");
+  await expect(page.getByRole("status").filter({ hasText: `${alias} moved to Contacted` })).toBeAttached();
+  await page.reload();
+  await page.getByRole("button", { name: "Kanban" }).click();
+  await expect(col("contacted").getByTestId("kanban-card")).toHaveCount(1);
+
+  // illegal drop (skipping steps) does nothing and sends no request
+  let transitions = 0;
+  page.on("request", (r) => r.url().includes("/transition") && transitions++);
+  await card.dragTo(col("benefits_verified"));
+  await expect(col("contacted").getByTestId("kanban-card")).toHaveCount(1);
+  await expect(col("benefits_verified").getByTestId("kanban-card")).toHaveCount(0);
+  expect(transitions).toBe(0);
+
+  // server errors roll the card back and show the error
+  await page.route("**/api/v1/inquiries/*/transition", (r) =>
+    r.fulfill({ status: 409, contentType: "application/json", body: JSON.stringify({ error: { code: "INVALID_TRANSITION", message: "Transition contacted → qualified is not allowed" } }) }),
+  );
+  await card.dragTo(col("qualified"));
+  await expect(page.getByTestId("kanban-error")).toContainText("was not moved: Transition contacted → qualified is not allowed");
+  await expect(col("contacted").getByTestId("kanban-card")).toHaveCount(1);
+  await expect(col("qualified").getByTestId("kanban-card")).toHaveCount(0);
+  await page.unroute("**/api/v1/inquiries/*/transition");
+
+  // keyboard alternative: the per-card "Move to…" menu lists legal moves only
+  const menu = card.getByTestId("kanban-move");
+  await expect(menu.locator("option")).toHaveText(["Move to…", "Qualified", "Waitlisted (opens drawer)", "Closed – unserviceable (opens drawer)", "Withdrawn (opens drawer)", "Inactive (opens drawer)"]);
+  await menu.selectOption("qualified");
+  await expect(col("qualified").getByTestId("kanban-card")).toHaveCount(1);
+  await expect(page.getByRole("status").filter({ hasText: `${alias} moved to Qualified` })).toBeAttached();
+  await expect(card).toHaveAttribute("draggable", "true");
+
+  // moves that need a reason open the drawer instead of transitioning silently
+  // (drag and menu share one code path; the Waitlisted column is scrolled off-screen at this width)
+  await menu.selectOption("waitlisted");
+  await expect(page.getByLabel(/Reason for moving to Waitlisted/)).toBeVisible();
+  await expect(page.getByTestId("drawer-stage")).toHaveText("Qualified");
+  const timeline = page.getByTestId("timeline");
+  await expect(timeline).toContainText("Contact Established · New → Contacted");
+  await expect(timeline).toContainText("Capacity Reviewed · Contacted → Qualified");
+  await page.getByLabel(/Reason for moving to Waitlisted/).fill("No verified capacity in preferred windows");
+  await page.getByRole("button", { name: "Confirm" }).click();
+  await expect(page.getByTestId("drawer-stage")).toHaveText("Waitlisted");
+  await expect(timeline).toContainText("No verified capacity in preferred windows");
+  await page.keyboard.press("Escape");
+
+  // roles without the transition permission cannot drag or move cards
+  await page.context().clearCookies();
+  await loginAs(page, "viewer");
+  await page.goto("/intake");
+  await page.getByRole("button", { name: "Kanban" }).click();
+  const viewerCard = page.getByTestId("kanban-card").first();
+  await expect(viewerCard).toBeVisible();
+  await expect(viewerCard).toHaveAttribute("draggable", "false");
+  await expect(page.getByTestId("kanban-move")).toHaveCount(0);
+});
