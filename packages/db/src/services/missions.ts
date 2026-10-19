@@ -242,6 +242,7 @@ export async function listMissions(db: Executor, ctx: Ctx, opts: { status?: stri
             title: contentDrafts.title,
             approvalStatus: contentDrafts.approvalStatus,
             revision: contentDrafts.revision,
+            locale: contentDrafts.locale,
           })
           .from(contentDrafts)
           .where(and(eq(contentDrafts.organizationId, ctx.orgId), inArray(contentDrafts.missionId, ids))),

@@ -338,4 +338,10 @@ test("11. generate and approve a Spanish (es-US) referral packet; print page set
   expect(exported.status()).toBe(200);
   expect(await exported.text()).toContain('<html lang="es-US">');
   await shot(page, "11b-spanish-packet-print");
+  // the missions list shows each draft's language without opening it
+  await page.goto("/missions");
+  const listed = page.getByTestId("mission-M2-west").getByTestId("draft-partner_packet");
+  await expect(listed.getByTestId("draft-list-locale")).toHaveAttribute("data-locale", "es-US");
+  await expect(listed.getByTestId("draft-list-locale").locator("[aria-hidden=true]")).toHaveText("ES");
+  await expect(listed).toHaveAccessibleName(/Language: Spanish \(es-US\)/);
 });

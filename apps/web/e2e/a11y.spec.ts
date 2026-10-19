@@ -165,3 +165,27 @@ test("Spanish (es-US) draft editor, packet print page and HTML export", async ({
   await expect(page.locator("html")).toHaveAttribute("lang", "es-US");
   await expectAccessible(page, "Spanish HTML export");
 });
+
+test("missions draft list with English and Spanish language badges", async ({ page }) => {
+  await reseed();
+  await loginAs(page, "admin");
+  await page.goto("/capacity");
+  await page.getByTestId("edit-capacity-west").click();
+  await page.getByTestId("hours-RBT-1-780").fill("6");
+  await page.getByTestId("save-capacity").click();
+  await expect(page.getByTestId("card-verified-hours-west")).toHaveText("46");
+  await page.goto("/missions");
+  await page.getByTestId("generate-missions").click();
+  const m2 = page.getByTestId("mission-M2-west");
+  await m2.getByTestId("approve-mission").click();
+  await expect(m2).toHaveAttribute("data-status", "approved");
+  for (const locale of ["en-US", "es-US"]) {
+    await m2.getByTestId("draft-locale").selectOption(locale);
+    await m2.getByTestId("generate-draft-partner_packet").click();
+    await expect(page.locator(".prose-draft")).toHaveAttribute("lang", locale);
+    await page.keyboard.press("Escape");
+    await expect(page.locator(".prose-draft")).toHaveCount(0);
+  }
+  await expect(m2.getByTestId("draft-list-locale")).toHaveCount(2);
+  await expectAccessible(page, "missions draft list with language badges");
+});

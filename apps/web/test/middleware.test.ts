@@ -13,7 +13,7 @@ describe("middleware", () => {
   });
 
   it("lets public paths through and still sets a CSP", () => {
-    for (const p of ["/login", "/api/v1/health", "/robots.txt"]) {
+    for (const p of ["/login", "/api/v1/health", "/api/v1/csp-report", "/robots.txt"]) {
       const res = middleware(req(p));
       expect(res.headers.get("location")).toBeNull();
       expect(res.headers.get("content-security-policy")).toContain("'strict-dynamic'");
@@ -34,5 +34,15 @@ describe("middleware", () => {
     const s = scriptSrc(contentSecurityPolicy("abc", false));
     expect(s).toBe("script-src 'self' 'nonce-abc' 'strict-dynamic'");
     expect(contentSecurityPolicy("abc", false)).toContain("object-src 'none'");
+  });
+
+  it("sends violation reports only to the same-origin endpoint", () => {
+    const csp = contentSecurityPolicy("abc", false);
+    expect(csp).toContain("report-uri /api/v1/csp-report");
+    expect(csp).toContain("report-to csp-endpoint");
+    const res = middleware(req("/", "cf_session=x"));
+    expect(res.headers.get("reporting-endpoints")).toBe('csp-endpoint="/api/v1/csp-report"');
+    const reportTo = JSON.parse(res.headers.get("report-to")!);
+    expect(reportTo).toMatchObject({ group: "csp-endpoint", endpoints: [{ url: "http://localhost:3000/api/v1/csp-report" }] });
   });
 });

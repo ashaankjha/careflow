@@ -52,6 +52,10 @@ test("pages are served with a per-request nonce CSP and still hydrate", async ({
   expect(scriptSrc).not.toContain("'unsafe-inline'");
   expect(scriptSrc).not.toContain("'unsafe-eval'");
   expect(csp).toContain("frame-ancestors 'none'");
+  // violation reports go only to our own same-origin endpoint
+  expect(csp).toContain("report-uri /api/v1/csp-report");
+  expect(csp).toContain("report-to csp-endpoint");
+  expect(res!.headers()["reporting-endpoints"]).toBe('csp-endpoint="/api/v1/csp-report"');
   expect(res!.headers()["x-frame-options"]).toBe("DENY");
   // Next.js stamps the nonce on its own scripts
   const stamped = await page.locator("script[nonce]").count();
@@ -64,4 +68,40 @@ test("pages are served with a per-request nonce CSP and still hydrate", async ({
   const appCsp = (await page.request.get("/")).headers()["content-security-policy"];
   expect(appCsp).toMatch(/script-src 'self' 'nonce-[^']+' 'strict-dynamic'/);
   expect(violations).toEqual([]);
+});
+
+test("CSP report endpoint accepts browser reports and normal navigation produces none", async ({ page }) => {
+  // Every report a browser would send is preceded by a securitypolicyviolation event in the document.
+  await page.addInitScript(() => {
+    const w = window as unknown as { __cspViolations: string[] };
+    w.__cspViolations = [];
+    document.addEventListener("securitypolicyviolation", (e) => w.__cspViolations.push(`${e.effectiveDirective} ${e.blockedURI}`));
+  });
+  const reports: string[] = [];
+  page.on("request", (r) => {
+    if (r.url().includes("/api/v1/csp-report")) reports.push(r.url());
+  });
+  await loginAs(page, "admin");
+  const seen: string[] = [];
+  for (const path of ["/", "/market", "/referrals", "/intake", "/capacity", "/missions", "/experiments", "/settings"]) {
+    await page.goto(path);
+    await page.waitForLoadState("networkidle").catch(() => {});
+    seen.push(...(await page.evaluate(() => (window as unknown as { __cspViolations: string[] }).__cspViolations)).map((v) => `${path}: ${v}`));
+  }
+  expect(seen).toEqual([]);
+  expect(reports).toEqual([]);
+
+  // the endpoint takes credential-less reports (both formats) and refuses anything else
+  const legacy = await page.request.post("/api/v1/csp-report", {
+    headers: { "content-type": "application/csp-report" },
+    data: JSON.stringify({ "csp-report": { "document-uri": "http://localhost/intake?x=1", "effective-directive": "script-src-elem", "blocked-uri": "inline" } }),
+  });
+  expect(legacy.status()).toBe(204);
+  const modern = await page.request.post("/api/v1/csp-report", {
+    headers: { "content-type": "application/reports+json" },
+    data: JSON.stringify([{ type: "csp-violation", body: { documentURL: "http://localhost/", effectiveDirective: "img-src", blockedURL: "https://example.com/a.png" } }]),
+  });
+  expect(modern.status()).toBe(204);
+  const json = await page.request.post("/api/v1/csp-report", { headers: { "content-type": "application/json" }, data: "{}" });
+  expect(json.status()).toBe(415);
 });

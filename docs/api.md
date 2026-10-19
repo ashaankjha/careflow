@@ -1,6 +1,6 @@
 # API (`/api/v1`)
 
-Typed Next.js route handlers in `apps/web/src/app/api/v1`. All handlers except `health` and `auth/*` run through `route(action, fn)`:
+Typed Next.js route handlers in `apps/web/src/app/api/v1`. All handlers except `health`, `csp-report` and `auth/*` run through `route(action, fn)`:
 
 * **Auth** — HttpOnly `cf_session` cookie (random 256-bit token; only its SHA-256 is stored), `SameSite=Lax`, `Secure` in production, 8-hour expiry. Unauthenticated → `401 UNAUTHENTICATED`.
 * **CSRF** — mutations (`POST/PUT/PATCH/DELETE`) must be same-origin (`Origin` host = `Host`), and bodies must be `application/json` (which also means no file uploads).
@@ -18,6 +18,7 @@ Typed Next.js route handlers in `apps/web/src/app/api/v1`. All handlers except `
 |---|---|---|
 | `GET /health` | public | `{status, database, mode}` only |
 | `POST /auth/login` · `POST /auth/logout` | public | sets/clears session cookie |
+| `POST /csp-report` | public | CSP violation reports from browsers (`application/csp-report` or `application/reports+json`); no session or same-origin check (browsers send without credentials); body ≤ 8 KB (`413`), other content types `415`, malformed `400`, 30/min per client IP (`429`); logs only directive names, blocked origin/keyword and document path (no query string, sample or body); `204` |
 | `GET /dashboard?range=30\|60\|90&from&to&centerId&source` | `dashboard:read` | KPIs (each with numerator/denominator; `capacity_fit_rate` is evaluated as of each inquiry's creation time, `asOf`, `withoutCapacityVersion`), funnel, stalls, trend, site matrix, attribution, provenance |
 | `GET /inquiries?stage&centerId&source&ownerId&q&page&pageSize` | `inquiry:read` | `stage` also accepts `active`, `stalled` |
 | `POST /inquiries` | `inquiry:create` | demo-only; `createInquirySchema`; `201` new / `200` replay |
