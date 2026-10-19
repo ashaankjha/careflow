@@ -10,7 +10,7 @@ import { FilterBar } from "@/components/filter-bar";
 import { KpiCard } from "@/components/overview/kpi-card";
 import { TrendChart } from "@/components/overview/trend-chart";
 import { Funnel } from "@/components/overview/funnel";
-import { db } from "@/lib/server/db";
+import { db, withOrg } from "@/lib/server/db";
 import { requireSession } from "@/lib/server/session";
 import { parseDashboardFilters } from "@/lib/filters";
 import { fmtDate, fmtDateTime, fmtNum, fmtPct, relativeDays } from "@/lib/format";
@@ -21,7 +21,7 @@ export const metadata = { title: "Overview" };
 export default async function OverviewPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const s = await requireSession();
   const filters = parseDashboardFilters(await searchParams);
-  const [d, centers, missions] = await Promise.all([getDashboard(db(), s.ctx, filters), listCenters(db(), s.ctx), listMissions(db(), s.ctx, { status: "proposed" })]);
+  const [d, centers, missions] = await withOrg(s.ctx, () => Promise.all([getDashboard(db(), s.ctx, filters), listCenters(db(), s.ctx), listMissions(db(), s.ctx, { status: "proposed" })]));
   const k = d.kpis;
   const tz = s.org.timezone;
   const exportHref = `/api/v1/inquiries/export?${new URLSearchParams(Object.entries({ range: String(filters.rangeDays), centerId: filters.centerId ?? "", source: filters.source ?? "" }).filter(([, v]) => v)).toString()}`;

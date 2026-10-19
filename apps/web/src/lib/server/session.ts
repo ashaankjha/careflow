@@ -3,7 +3,7 @@ import { resolveSession, type SessionUser } from "@careflow/db";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
-import { db } from "./db";
+import { publicDb } from "./db";
 
 export const SESSION_COOKIE = "cf_session";
 
@@ -20,7 +20,7 @@ export function sessionCookieOptions(expires: Date) {
 /** Server-component session lookup (validated against the DB on every request). */
 export const getSession = cache(async (): Promise<SessionUser | null> => {
   const jar = await cookies();
-  return resolveSession(db(), jar.get(SESSION_COOKIE)?.value);
+  return resolveSession(publicDb(), jar.get(SESSION_COOKIE)?.value);
 });
 
 export async function requireSession(): Promise<SessionUser> {

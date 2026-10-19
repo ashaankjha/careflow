@@ -10,6 +10,11 @@ export function testDb() {
   return createDb(process.env.TEST_DATABASE_URL ?? "postgres://postgres:postgres@localhost:5432/careflow_test", { max: 4 });
 }
 
+/** Least-privilege `careflow_app` connection to the test database (RLS applies). */
+export function testAppDb(max = 4) {
+  return createDb(process.env.TEST_APP_DATABASE_URL ?? "postgres://careflow_app:careflow_app_dev_only@localhost:5432/careflow_test", { max });
+}
+
 export async function reseed(db: ReturnType<typeof testDb>["db"]) {
   return seedDatabase(db, { now: ANCHOR });
 }

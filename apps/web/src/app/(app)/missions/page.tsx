@@ -3,14 +3,14 @@ import { listMissions, listPartners } from "@careflow/db";
 import { SyntheticBadge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/misc";
 import { MissionsWorkspace } from "@/components/missions/workspace";
-import { db } from "@/lib/server/db";
+import { db, withOrg } from "@/lib/server/db";
 import { requireSession } from "@/lib/server/session";
 
 export const metadata = { title: "Growth Missions" };
 
 export default async function MissionsPage() {
   const s = await requireSession();
-  const [missions, partners] = await Promise.all([listMissions(db(), s.ctx), listPartners(db(), s.ctx)]);
+  const [missions, partners] = await withOrg(s.ctx, () => Promise.all([listMissions(db(), s.ctx), listPartners(db(), s.ctx)]));
   const r = s.user.role;
   return (
     <>

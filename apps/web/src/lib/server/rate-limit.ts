@@ -1,19 +1,13 @@
 import "server-only";
+import { hitRateLimit } from "@careflow/db";
+import { publicDb } from "./db";
 
-/** In-memory token bucket (per process). Production should use a shared store. */
-const buckets = new Map<string, { tokens: number; at: number }>();
-
-export function rateLimit(key: string, capacity = 60, refillPerSec = 1): boolean {
-  const now = Date.now();
-  const b = buckets.get(key) ?? { tokens: capacity, at: now };
-  b.tokens = Math.min(capacity, b.tokens + ((now - b.at) / 1000) * refillPerSec);
-  b.at = now;
-  if (b.tokens < 1) {
-    buckets.set(key, b);
-    return false;
-  }
-  b.tokens -= 1;
-  buckets.set(key, b);
-  if (buckets.size > 10_000) buckets.clear();
-  return true;
+/**
+ * Shared fixed-window limiter (Postgres `rate_limit_buckets`, one upsert per
+ * call), so limits hold across processes and nodes. Runs on its own autocommit
+ * statement — outside the request transaction — so rejected or rolled-back
+ * requests still count.
+ */
+export async function rateLimit(key: string, limit: number, windowSeconds = 60): Promise<boolean> {
+  return (await hitRateLimit(publicDb(), key, limit, windowSeconds)).allowed;
 }

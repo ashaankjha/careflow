@@ -3,14 +3,14 @@ import { listCenters, marketZctas } from "@careflow/db";
 import { SyntheticBadge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/misc";
 import { MarketWorkspace } from "@/components/market/workspace";
-import { db } from "@/lib/server/db";
+import { db, withOrg } from "@/lib/server/db";
 import { requireSession } from "@/lib/server/session";
 
 export const metadata = { title: "Market Map" };
 
 export default async function MarketPage() {
   const s = await requireSession();
-  const [m, centers] = await Promise.all([marketZctas(db(), s.ctx), listCenters(db(), s.ctx)]);
+  const [m, centers] = await withOrg(s.ctx, () => Promise.all([marketZctas(db(), s.ctx), listCenters(db(), s.ctx)]));
   return (
     <>
       <PageHeader

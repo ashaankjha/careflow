@@ -15,6 +15,13 @@
       "when": 1792373502298,
       "tag": "0001_integrity_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792373503000,
+      "tag": "0002_app_role_rls",
+      "breakpoints": true
     }
   ]
 }

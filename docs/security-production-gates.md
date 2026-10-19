@@ -10,10 +10,13 @@
 | No clinical data | No diagnosis, DOB, severity or record-upload fields exist; JSON-only bodies (no attachments) | schema, `api.test.ts` |
 | AuthN | Self-hosted sessions: 256-bit random tokens, only SHA-256 stored, HttpOnly, SameSite=Lax, Secure in production, 8 h expiry; scrypt password hashes | `packages/db/src/auth.ts`, `services/session.ts` |
 | AuthZ | Explicit RBAC matrix enforced in every route **and** every service; UI only mirrors it; denials audited | `permissions.ts`, `security.spec.ts`, `operations.test.ts` |
-| Tenancy | Composite tenant FKs, service-level scoping, RLS policies (defense in depth) | `tenancy.test.ts` |
+| Tenancy | Web app runs as non-owner role `careflow_app` (no SUPERUSER/BYPASSRLS, owns nothing); every API request and server-component data load runs in one transaction with transaction-local `set_config('app.current_org', orgId, true)`; `FORCE ROW LEVEL SECURITY` + `tenant_isolation` policy (all commands, `USING` + `WITH CHECK`) on every tenant table and `organizations`/`users`/`sessions`; missing tenant ⇒ no rows / writes rejected; plus composite tenant FKs and service-level scoping | `app-role.test.ts`, `tenancy.test.ts`, `api.test.ts` |
+| Pre-tenant auth path | Sign-in, cookie resolution and logout use three SECURITY DEFINER functions (`careflow_auth_lookup(email)`, `careflow_resolve_session(token_hash)`, `careflow_revoke_session(token_hash)`): fixed `search_path`, one key in, at most one row out, EXECUTE revoked from PUBLIC and granted only to `careflow_app`. The session insert + audit at sign-in run in the user's own tenant transaction | `app-role.test.ts` |
+| Least privilege | `careflow_app` has DML only (no TRUNCATE/DDL); no UPDATE/DELETE on `audit_logs`/`inquiry_events` (so the `careflow.allow_purge` GUC is useless to it); no INSERT/DELETE on `organizations`/`users`. `ALTER DEFAULT PRIVILEGES` grants DML on tables later migrations create; those migrations must add their own policy (a test fails if any table with `organization_id` lacks forced RLS + policy) | `0002_app_role_rls.sql`, `app-role.test.ts` |
+| Maintenance path | Migrations, `db:seed`, `db:reset`, jobs CLI and the demo-reset purge use the owner role (`DATABASE_URL`), which must be SUPERUSER or BYPASSRLS (checked before seeding/reset). The web process touches it only for *Settings → Reset demo* (demo orgs, admin only, audited); `DEMO_RESET_ENABLED=false` removes even that | `demo.ts`, `app-role.test.ts` |
 | Integrity | Immutable `inquiry_events` and `audit_logs` (triggers); event-order checks; idempotency keys; optimistic locking on capacity and drafts | `intake.test.ts`, `tenancy.test.ts` |
 | CSRF | Same-origin check on all mutations, SameSite cookies, JSON-only bodies | `api.test.ts` |
-| Rate limiting | Per-user and per-IP token buckets (in-memory) | `rate-limit.ts` |
+| Rate limiting | Shared fixed-window counters in Postgres (`rate_limit_buckets`, atomic upsert; works across processes/nodes): per user 60 writes/300 reads per minute, sign-in 20/min per IP | `rate-limit.test.ts`, `api.test.ts` |
 | Headers | CSP (`default-src 'self'`, no third-party script/connect), `frame-ancestors 'none'`, nosniff, `Referrer-Policy: no-referrer`, Permissions-Policy, HSTS in production | `next.config.ts` |
 | Tracking | No analytics, pixels, session recorders or ad tags anywhere; no identifiers in query strings sent off-site | CSP + code review |
 | Logging | Server logs contain error class/code + request id only — never request bodies | `api.test.ts` |
@@ -27,8 +30,8 @@
 
 | # | Risk | Current mitigation | Residual / blocker before PHI |
 |---|---|---|---|
-| R1 | App connects as DB owner → RLS bypassed | Service scoping + composite FKs + tests | **Blocker**: run as non-owner role; set `app.current_org` per transaction; `FORCE ROW LEVEL SECURITY` |
-| R2 | In-memory rate limiter resets per process | Fine for single-node demo | Shared store (Redis/DB) behind a WAF |
+| R1 | ~~App connects as DB owner → RLS bypassed~~ **Mitigated in code**: non-owner `careflow_app` role, per-transaction `app.current_org`, FORCEd RLS on all tenant tables, SECURITY DEFINER pre-tenant session functions; isolation tests under the app role | Service scoping + composite FKs + enforced RLS + tests | Before PHI: independent penetration test of tenant isolation (gate 5); a real secret for `careflow_app` (the `.env.example` password is dev-only); `DEMO_RESET_ENABLED=false` and no `DATABASE_URL` in the web runtime; run the jobs CLI under a scoped role too (it still uses the owner); review every new table’s policy |
+| R2 | ~~In-memory rate limiter resets per process~~ **Mitigated in code**: shared Postgres fixed-window limiter | Works across processes/nodes | Edge WAF / bot protection in front; trusted proxy so the sign-in IP key (`X-Forwarded-For`) can't be spoofed; per-account lockout; counters are UNLOGGED (lost on DB crash) |
 | R3 | CSP allows `'unsafe-inline'` scripts (Next.js bootstrap) | No third-party origins | Nonce-based CSP |
 | R4 | Demo passwords are public | Synthetic tenant only | SSO/OIDC with MFA; disable seeded users |
 | R5 | No encryption-at-rest configuration in repo | Local dev only | Managed Postgres with KMS keys, TLS everywhere, backups tested |
@@ -54,3 +57,8 @@
 12. Organization sign-off by privacy, security, compliance and clinical leadership.
 
 Never market this product as “HIPAA compliant” on the basis of code.
+
+## Verification notes (tenancy / rate limiting)
+
+* Verified locally on PostgreSQL 16 (no Docker): migrations from a dropped-and-recreated database **and** a dropped `careflow_app` role, migrate run twice (idempotent), `db:reset`, `pnpm test` (isolation under the app role in `packages/db/test/app-role.test.ts`) and the full Playwright suite with the web app connected as `careflow_app`.
+* `docker-compose.yml` was checked by reading only (Docker is unavailable in the build environment): the `postgres` superuser matches `DATABASE_URL`, `scripts/init-test-db.sql` creates `careflow_test`, and the app role is created by `pnpm db:migrate`, not by the container. Not verified: running the Compose stack itself.

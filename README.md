@@ -38,10 +38,12 @@ Requirements: Node ≥ 20, pnpm 10, PostgreSQL 16 (Docker Compose provided). **N
 pnpm install
 cp .env.example .env          # synthetic defaults, no real credentials
 docker compose up -d          # or use any local PostgreSQL 16; create databases careflow + careflow_test
-pnpm db:migrate
+pnpm db:migrate               # as the owner role; also creates/updates the app role `careflow_app`
 pnpm db:seed                  # deterministic synthetic fixture
-pnpm dev                      # http://localhost:3000
+pnpm dev                      # http://localhost:3000 — serves requests as `careflow_app` (RLS enforced)
 ```
+
+**Two database roles.** `DATABASE_URL` is the owner/migration role (must be SUPERUSER or BYPASSRLS — the Compose `postgres` user is): it runs migrations, `db:seed`, `db:reset`, the jobs CLI and the demo-reset purge. The web app serves every request as the least-privilege `careflow_app` role from `APP_DATABASE_URL`, inside a transaction that sets `app.current_org`; row-level security is FORCEd on every tenant table. `pnpm db:migrate` creates the role idempotently (NOLOGIN in the migration, no secret) and then sets its LOGIN password from `APP_DATABASE_URL` — the `.env.example` password is **dev-only**. Using an existing PostgreSQL instead of Compose? The migration role also needs `CREATEROLE` (or create `careflow_app` yourself and give `APP_DATABASE_URL` a different user to skip the password sync).
 
 ### Demo credentials (password for all: `demo-pass-2026`)
 
@@ -88,12 +90,15 @@ Details, diagrams and the rule trace: [`docs/architecture.md`](docs/architecture
 
 ## Environment variables
 
-See [`.env.example`](.env.example). Everything optional except `DATABASE_URL`.
+See [`.env.example`](.env.example). Defaults match the local/Compose setup.
 
 | Variable | Default | Notes |
 |---|---|---|
-| `DATABASE_URL` | `postgres://postgres:postgres@localhost:5432/careflow` | |
+| `DATABASE_URL` | `postgres://postgres:postgres@localhost:5432/careflow` | owner/migration role (SUPERUSER or BYPASSRLS); migrations, seed, reset, jobs, demo-reset purge |
+| `APP_DATABASE_URL` | `postgres://careflow_app:careflow_app_dev_only@localhost:5432/careflow` | least-privilege role for all web requests; **dev-only password** |
 | `TEST_DATABASE_URL` | `…/careflow_test` | must contain “test” |
+| `TEST_APP_DATABASE_URL` | `postgres://careflow_app:careflow_app_dev_only@…/careflow_test` | app role on the test DB (roles are cluster-wide: same password as `APP_DATABASE_URL`) |
+| `DEMO_RESET_ENABLED` | enabled | set `false` to disable *Settings → Reset* (and stop the web app from using `DATABASE_URL`) |
 | `EXPERIMENT_HMAC_SALT` | dev value | HMAC salt for assignments; change in any shared deployment (sessions are random tokens stored as SHA-256 hashes) |
 | `SEED_ANCHOR_DATE` | today | `YYYY-MM-DD` for byte-identical resets |
 | `CENSUS_API_KEY`, `ACS_ZCTAS` | unset | optional real ACS refresh into the provenance table |

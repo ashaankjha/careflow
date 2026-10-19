@@ -3,15 +3,15 @@ import { capacitySummaries, getCenterCapacity, listCenters, listPayers, marketZc
 import { SyntheticBadge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/misc";
 import { CapacityWorkspace } from "@/components/capacity/workspace";
-import { db } from "@/lib/server/db";
+import { db, withOrg } from "@/lib/server/db";
 import { requireSession } from "@/lib/server/session";
 
 export const metadata = { title: "Capacity & Matching" };
 
 export default async function CapacityPage() {
   const s = await requireSession();
-  const [centers, payers, caps, market] = await Promise.all([listCenters(db(), s.ctx), listPayers(db(), s.ctx), capacitySummaries(db(), s.ctx), marketZctas(db(), s.ctx)]);
-  const sheets = await Promise.all(centers.map((c) => getCenterCapacity(db(), s.ctx, c.id)));
+  const [centers, payers, caps, market] = await withOrg(s.ctx, () => Promise.all([listCenters(db(), s.ctx), listPayers(db(), s.ctx), capacitySummaries(db(), s.ctx), marketZctas(db(), s.ctx)]));
+  const sheets = await withOrg(s.ctx, () => Promise.all(centers.map((c) => getCenterCapacity(db(), s.ctx, c.id))));
   const data = JSON.parse(JSON.stringify(sheets.map((sh) => ({ ...sh, summary: caps.find((c) => c.centerId === sh.center.id) }))));
   return (
     <>
