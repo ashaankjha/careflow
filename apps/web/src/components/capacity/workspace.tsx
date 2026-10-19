@@ -76,7 +76,10 @@ export function CapacityWorkspace({ sheets, payers, zctas, canEdit, canEditPayer
                   <div className="rounded-lg bg-canvas p-3">
                     <div className="text-[11.5px] text-ink-3">Placement holds</div>
                     <div className="mt-1 text-2xl font-semibold tabular">{sh.holds.length}</div>
-                    <div className="text-[11px] text-ink-3">{sh.holds.reduce((s, h) => s + h.directWeeklyHoursEstimate, 0)} h proposed</div>
+                    <div className="text-[11px] text-ink-3" data-testid={`holds-summary-${key}`}>
+                      {sh.holds.filter((h) => h.status === "reserved").reduce((s, h) => s + h.directWeeklyHoursEstimate, 0)} h reserved · {sh.holds.filter((h) => h.status !== "reserved").reduce((s, h) => s + h.directWeeklyHoursEstimate, 0)} h proposed
+                      <span className="block">Not appointments</span>
+                    </div>
                   </div>
                 </div>
                 <div>

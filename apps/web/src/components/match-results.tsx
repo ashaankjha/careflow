@@ -34,7 +34,22 @@ function ScoreBar({ label, value, weight }: { label: string; value: number; weig
   );
 }
 
-export function MatchResults({ result, onSelect, selectable, selectedCenterId }: { result: MatchResult; onSelect?: (centerId: string) => void; selectable?: boolean; selectedCenterId?: string | null }) {
+export function MatchResults({
+  result,
+  onSelect,
+  selectable,
+  selectedCenterId,
+  onReserve,
+  reservedCenterId,
+}: {
+  result: MatchResult;
+  onSelect?: (centerId: string) => void;
+  selectable?: boolean;
+  selectedCenterId?: string | null;
+  /** Offered only on verified potential fits, and only while the inquiry has no active reserved hold. */
+  onReserve?: (centerId: string) => void;
+  reservedCenterId?: string | null;
+}) {
   const s = STATUS_COPY[result.status];
   return (
     <div className="space-y-3" data-testid="match-results" data-status={result.status}>
@@ -49,6 +64,7 @@ export function MatchResults({ result, onSelect, selectable, selectedCenterId }:
                 <span className="text-[13.5px] font-semibold">{m.centerName}</span>
                 <Badge tone={e.tone}>{e.label}</Badge>
                 {selectedCenterId === m.centerId && <Badge tone="ink">Selected site</Badge>}
+                {reservedCenterId === m.centerId && <Badge tone="good" data-testid="hold-reserved-badge">Capacity hold reserved · not an appointment</Badge>}
               </div>
               <div className="flex items-center gap-3 text-[12px] text-ink-3">
                 {m.distanceMiles != null && <Tip content="Great-circle approximation from the ZCTA centroid; travel time not evaluated."><span className="cursor-help underline decoration-dotted">~{m.distanceMiles} mi</span></Tip>}
@@ -76,9 +92,16 @@ export function MatchResults({ result, onSelect, selectable, selectedCenterId }:
             )}
             <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px] text-ink-3">
               <span className="flex items-center gap-1"><CircleDashed className="h-3 w-3" />Capacity evidence: {m.capacityEvidenceAt ? new Date(m.capacityEvidenceAt).toLocaleString() : "no verified windows"}</span>
-              {selectable && m.eligibility !== "not_feasible" && onSelect && selectedCenterId !== m.centerId && (
-                <button className="rounded-md border border-line px-2 py-1 text-[12px] font-medium text-ink hover:bg-canvas" onClick={() => onSelect(m.centerId)}>Select as target site</button>
-              )}
+              <span className="flex flex-wrap gap-2">
+                {onReserve && !reservedCenterId && m.eligibility === "potential_fit" && (
+                  <Tip content="Sets aside verified staff hours for this family until the hold expires. Not an appointment or a scheduled session.">
+                    <button className="rounded-md border border-good/40 bg-good-soft px-2 py-1 text-[12px] font-medium text-good hover:bg-good-soft/70" onClick={() => onReserve(m.centerId)} data-testid="reserve-hold">Reserve capacity hold</button>
+                  </Tip>
+                )}
+                {selectable && m.eligibility !== "not_feasible" && onSelect && selectedCenterId !== m.centerId && (
+                  <button className="rounded-md border border-line px-2 py-1 text-[12px] font-medium text-ink hover:bg-canvas" onClick={() => onSelect(m.centerId)}>Select as target site</button>
+                )}
+              </span>
             </div>
           </div>
         );

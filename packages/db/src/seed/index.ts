@@ -6,6 +6,7 @@ import type { Db, Tx } from "../client";
 import { seedUuid } from "../ids";
 import * as s from "../schema";
 import { hmacSalt } from "../services/experiments";
+import { writeCapacityVersion } from "../services/capacity";
 import { generateMissions } from "../services/missions";
 import { marketZctas } from "../services/market";
 import type { Ctx } from "../services/context";
@@ -42,6 +43,53 @@ export function seedNow(): Date {
 
 const DEMO_ORGS = [HARBOR.id, LAKESIDE.id];
 
+/** Seeded capacity history: ops re-attests the (unchanged) sheet every 28 days. */
+export const SEED_ATTESTATION_CYCLE_DAYS = 28;
+/** Enough attestation cycles to cover the oldest seeded inquiry (90 days) for every site. */
+const SEED_HISTORY_CYCLES = 5;
+
+type SeedWindow = {
+  role: "RBT" | "BCBA";
+  dayOfWeek: number;
+  startMinute: number;
+  endMinute: number;
+  weeklyAvailableHours: number;
+  serviceMode: string;
+  /** null = never verified (pending ops verification in every version). */
+  verified: boolean;
+};
+
+/**
+ * Backfill capacity versions (risk R8) consistent with the live sheet: the
+ * newest version starts at the most recent attestation (`lastAttestedDaysAgo`)
+ * and carries the live verification timestamps; earlier versions repeat the same
+ * values, each attested when it took effect. Returns the current version number.
+ */
+async function seedCapacityHistory(
+  tx: Tx,
+  orgId: string,
+  cid: string,
+  lastAttestedDaysAgo: number,
+  windows: SeedWindow[],
+  rules: { payerId: string | null; requiredBcbaHoursPerDirectHour: number | null; minRbtCoverage: number | null; maxNewStartsPerWeek: number | null; isVerified: boolean }[],
+  ago: (days: number) => Date,
+  recordedBy: string | null,
+) {
+  for (let v = 1; v <= SEED_HISTORY_CYCLES; v++) {
+    const validFrom = ago(lastAttestedDaysAgo + (SEED_HISTORY_CYCLES - v) * SEED_ATTESTATION_CYCLE_DAYS);
+    await writeCapacityVersion(tx, orgId, {
+      centerId: cid,
+      version: v,
+      validFrom,
+      attested: true,
+      recordedBy,
+      windows: windows.map((w) => ({ ...w, verifiedAt: w.verified ? validFrom : null })),
+      rules,
+    });
+  }
+  return SEED_HISTORY_CYCLES;
+}
+
 /** Delete all tenant data for the demo organisations (keeps orgs, users and sessions so admins stay signed in). */
 async function purgeDemoData(tx: Tx) {
   await tx.execute(sql`set local careflow.allow_purge = 'on'`);
@@ -57,6 +105,8 @@ async function purgeDemoData(tx: Tx) {
     s.missionEvidence,
     s.missions,
     s.capacityHolds,
+    s.staffCapacityWindowVersions,
+    s.capacityVersions,
     s.inquiryCenterMatches,
     s.inquiryEvents,
     s.inquiries,
@@ -122,7 +172,7 @@ export async function seedDatabase(db: Db, opts: { now?: Date } = {}) {
           intakePhone: c.phone,
           intakeEmail: c.email,
           publicProfileStatus: c.publicProfileStatus,
-          capacityVersion: 1,
+          capacityVersion: SEED_HISTORY_CYCLES,
           capacityVerifiedAt: verifiedDays.length ? ago(Math.min(...verifiedDays)) : null,
           capacityVerifiedBy: userId("ops"),
           demoFixture: true,
@@ -159,16 +209,34 @@ export async function seedDatabase(db: Db, opts: { now?: Date } = {}) {
           })),
         ),
       );
-      await tx.insert(s.capacityRules).values(
-        CAPACITY_RULES[c.key]!.map((r) => ({
-          organizationId: HARBOR.id,
-          centerId: cid,
-          payerId: r.payer ? payerId(r.payer) : null,
-          requiredBcbaHoursPerDirectHour: r.ratio,
-          minRbtCoverage: r.minRbt,
-          maxNewStartsPerWeek: r.maxNew,
-          isVerified: r.verified,
-        })),
+      const rules = CAPACITY_RULES[c.key]!.map((r) => ({
+        payerId: r.payer ? payerId(r.payer) : null,
+        requiredBcbaHoursPerDirectHour: r.ratio,
+        minRbtCoverage: r.minRbt,
+        maxNewStartsPerWeek: r.maxNew,
+        isVerified: r.verified,
+      }));
+      await tx.insert(s.capacityRules).values(rules.map((r) => ({ ...r, organizationId: HARBOR.id, centerId: cid })));
+      const verifiedDays = CAPACITY_WINDOWS[c.key]!.map((w) => w.verifiedDaysAgo).filter((d): d is number => d !== null);
+      await seedCapacityHistory(
+        tx,
+        HARBOR.id,
+        cid,
+        Math.min(...verifiedDays),
+        CAPACITY_WINDOWS[c.key]!.flatMap((w) =>
+          w.days.map((d, i) => ({
+            role: w.role,
+            dayOfWeek: d,
+            startMinute: w.start,
+            endMinute: w.end,
+            weeklyAvailableHours: Array.isArray(w.hours) ? w.hours[i]! : w.hours,
+            serviceMode: w.mode,
+            verified: w.verifiedDaysAgo !== null,
+          })),
+        ),
+        rules,
+        ago,
+        userId("ops"),
       );
     }
 
@@ -255,6 +323,8 @@ export async function seedDatabase(db: Db, opts: { now?: Date } = {}) {
           status: "proposed",
           expiresAt: new Date(now.getTime() + 14 * DAY),
           assignedBy: userId("ops"),
+          createdAt: now,
+          updatedAt: now,
         });
       }
     }
@@ -331,12 +401,15 @@ export async function seedDatabase(db: Db, opts: { now?: Date } = {}) {
       serviceRadiusMiles: 10,
       intakePhone: "555-0200 (demo)",
       intakeEmail: "intake@lakeside.demo",
-      capacityVersion: 1,
+      capacityVersion: SEED_HISTORY_CYCLES,
       capacityVerifiedAt: ago(3),
     });
     await tx.insert(s.centerPayers).values({ organizationId: LAKESIDE.id, centerId: lc, payerId: lp, status: "verified_accepted", lastVerifiedAt: ago(3) });
-    await tx.insert(s.staffCapacityWindows).values({ organizationId: LAKESIDE.id, centerId: lc, role: "RBT", dayOfWeek: 1, startMinute: 480, endMinute: 720, weeklyAvailableHours: 4, serviceMode: "center", verifiedAt: ago(3) });
-    await tx.insert(s.capacityRules).values({ organizationId: LAKESIDE.id, centerId: lc, requiredBcbaHoursPerDirectHour: 0.1, isVerified: true });
+    const lakesideWindow = { role: "RBT" as const, dayOfWeek: 1, startMinute: 480, endMinute: 720, weeklyAvailableHours: 4, serviceMode: "center" };
+    const lakesideRule = { payerId: null, requiredBcbaHoursPerDirectHour: 0.1, minRbtCoverage: null, maxNewStartsPerWeek: null, isVerified: true };
+    await tx.insert(s.staffCapacityWindows).values({ organizationId: LAKESIDE.id, centerId: lc, ...lakesideWindow, verifiedAt: ago(3) });
+    await tx.insert(s.capacityRules).values({ organizationId: LAKESIDE.id, centerId: lc, ...lakesideRule });
+    await seedCapacityHistory(tx, LAKESIDE.id, lc, 3, [{ ...lakesideWindow, verified: true }], [lakesideRule], ago, null);
     for (let i = 0; i < 5; i++) {
       const id = seedUuid(`inquiry:lakeside:${i}`);
       const created = ago(10 + i);

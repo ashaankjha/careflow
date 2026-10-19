@@ -523,3 +523,27 @@ export function verifiedDirectHoursAvailable(
   const reason = bcbaCap < rbtFree ? "Limited by verified BCBA supervision" : "Limited by verified RBT availability";
   return { hours, pendingHours: round(pending, 1), reason };
 }
+
+/** Gates that measure verified capacity; a reservation conflicts when any of them fails. */
+export const CAPACITY_GATES: readonly GateKey[] = ["rbt_schedule", "bcba_supervision", "new_start_limit"];
+
+export const HOLD_DISCLAIMER =
+  "A reserved capacity hold temporarily sets aside verified staff hours for this family. It is not an appointment, a scheduled session, or a benefits or clinical determination, and it expires automatically.";
+
+export type ReservationCheck =
+  | { ok: true; directWeeklyHours: number; bcbaWeeklyHours: number }
+  | { ok: false; reason: "capacity_conflict" | "not_potential_fit"; gates: Gate[] };
+
+/**
+ * Whether a center evaluation may become a reserved hold: only a verified
+ * potential fit can be reserved. A failing capacity gate is a capacity conflict
+ * (another hold or start used the hours); anything else needs staff work first.
+ */
+export function reservationCheck(m: CenterMatch): ReservationCheck {
+  const capacityFails = m.gates.filter((g) => CAPACITY_GATES.includes(g.key) && g.status === "fail");
+  if (capacityFails.length) return { ok: false, reason: "capacity_conflict", gates: capacityFails };
+  if (m.eligibility !== "potential_fit") {
+    return { ok: false, reason: "not_potential_fit", gates: m.gates.filter((g) => g.status === "fail" || g.status === "verification_needed") };
+  }
+  return { ok: true, directWeeklyHours: m.capacity.requestedHours, bcbaWeeklyHours: m.capacity.bcbaRequiredHours ?? 0 };
+}

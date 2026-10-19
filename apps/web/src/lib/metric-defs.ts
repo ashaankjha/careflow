@@ -28,10 +28,10 @@ export const METRIC_DEFS: Record<string, { label: string; definition: string; nu
   },
   capacity_fit_rate: {
     label: "Capacity-fit inquiries",
-    definition: "Cohort inquiries with at least one verified potential-fit site, evaluated against the current verified capacity snapshot.",
+    definition: "Cohort inquiries with at least one verified potential-fit site, evaluated against the capacity version in force when each inquiry was created (as-of semantics).",
     numerator: "Inquiries with ≥1 verified potential fit",
     denominator: "Cohort inquiries with required inputs (ZIP in study area, payer, mode, time windows)",
-    caveat: "Missing-input inquiries are reported separately. A potential fit is not eligibility or an appointment.",
+    caveat: "Missing-input inquiries are reported separately. Payer participation is applied as currently recorded. A potential fit is not eligibility or an appointment.",
   },
   unresolved_stalls: {
     label: "Unresolved intake stalls",

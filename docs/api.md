@@ -18,7 +18,7 @@ Typed Next.js route handlers in `apps/web/src/app/api/v1`. All handlers except `
 |---|---|---|
 | `GET /health` | public | `{status, database, mode}` only |
 | `POST /auth/login` · `POST /auth/logout` | public | sets/clears session cookie |
-| `GET /dashboard?range=30\|60\|90&from&to&centerId&source` | `dashboard:read` | KPIs (each with numerator/denominator), funnel, stalls, trend, site matrix, attribution, provenance |
+| `GET /dashboard?range=30\|60\|90&from&to&centerId&source` | `dashboard:read` | KPIs (each with numerator/denominator; `capacity_fit_rate` is evaluated as of each inquiry's creation time, `asOf`, `withoutCapacityVersion`), funnel, stalls, trend, site matrix, attribution, provenance |
 | `GET /inquiries?stage&centerId&source&ownerId&q&page&pageSize` | `inquiry:read` | `stage` also accepts `active`, `stalled` |
 | `POST /inquiries` | `inquiry:create` | demo-only; `createInquirySchema`; `201` new / `200` replay |
 | `GET /inquiries/:id` | `inquiry:read` | inquiry + immutable timeline (read is audited) |
@@ -28,6 +28,9 @@ Typed Next.js route handlers in `apps/web/src/app/api/v1`. All handlers except `
 | `POST /inquiries/:id/owner` | `inquiry:transition` | assign intake owner |
 | `GET /inquiries/:id/matches` | `matching:evaluate` | live evaluation + saved snapshots |
 | `POST /inquiries/:id/matches` | `matching:persist` | persist snapshot with gate reasons |
+| `GET /inquiries/:id/holds` | `inquiry:read` | capacity holds (newest first) with `effectiveStatus` (`expired` when past `expiresAt`), the hold disclaimer, and `canReserve`/`canRelease` UI hints |
+| `POST /inquiries/:id/holds` | `hold:reserve` | `{centerId}` → reserve verified capacity (see below); `{hold, created, disclaimer}` |
+| `POST /holds/:id/release` | `hold:release` | `{reason?}`; idempotent → `{hold, released}` |
 | `POST /inquiries/import` | `inquiry:import` | `{csv, commit}`; preview with line errors; idempotent on `(org, source, external_id)` |
 | `GET /inquiries/template` | `inquiry:read` | demo CSV template |
 | `GET /inquiries/export` | `inquiry:export_aggregate` | aggregate-only CSV (audited) |
@@ -51,6 +54,24 @@ Typed Next.js route handlers in `apps/web/src/app/api/v1`. All handlers except `
 | `POST /drafts/:id/send` | any | **always `403 FEATURE_DISABLED`** (audited) |
 | `GET /sources` · `GET /audit` | `sources:read` / `audit:read` | |
 | `POST /demo/reset` | `demo:reset` (admin) | demo organizations only; `403 FEATURE_DISABLED` when `DEMO_RESET_ENABLED=false` |
+
+## Capacity holds (`POST /inquiries/:id/holds`)
+
+A reserved hold sets aside verified staff hours for one family. **It is not an appointment**, a scheduled session, or a benefits/clinical determination.
+
+* Runs in one transaction that locks the center row (`SELECT … FOR UPDATE`; capacity edits update the same row) and the inquiry row, then re-evaluates the match against every committed hold. Concurrent reservations therefore never exceed verified RBT/BCBA hours or the weekly new-start limit.
+* Only a verified `potential_fit` can be reserved. A failing capacity gate (RBT schedule, BCBA supervision, weekly new-start limit) → `409 CONFLICT` with the failing gates in `details`; any other non-fit (payer unknown, unverified hours, …) → `422 VALIDATION_FAILED`. Inquiry must be in an active stage.
+* Hours held = requested direct hours (or the planning default) and `requested × supervision ratio` BCBA hours. `expiresAt = now + holdTtlDays` (tenant policy, default 7).
+* An existing *proposed* hold for the same inquiry and center is converted in place; proposals at other centers are released (`superseded`). Re-reserving the same center while active returns the existing hold (`created: false`); a reserved hold at another center → `409`.
+* Writes `capacity_hold_reserved` / `capacity_hold_released` / `capacity_hold_expired` inquiry events and `hold.*` audit entries. Expired holds stop subtracting capacity immediately (lazy expiry at read time); `pnpm jobs expire-holds` marks them released.
+
+```json
+{ "hold": { "id": "…", "centerId": "…", "status": "reserved", "effectiveStatus": "reserved", "active": true,
+            "directWeeklyHoursEstimate": 6, "bcbaWeeklyHoursEstimate": 0.6,
+            "reservedAt": "2026-10-01T18:00:00.000Z", "expiresAt": "2026-10-08T18:00:00.000Z", "centerName": "South Center" },
+  "created": true,
+  "disclaimer": "A reserved capacity hold temporarily sets aside verified staff hours for this family. It is not an appointment, …" }
+```
 
 ## Example: `POST /matching/evaluate`
 

@@ -156,3 +156,34 @@ test("7. reset demo restores the exact seed state", async ({ page }) => {
   await page.goto("/settings");
   await shot(page, "07-settings");
 });
+
+test("8. reserve verified capacity as a hold (not an appointment), then release it", async ({ page }) => {
+  const alias = `Demo Family Hold${Date.now() % 1000}`;
+  await loginAs(page, "intake");
+  await page.goto("/intake");
+  await page.getByTestId("add-inquiry").click();
+  await page.getByLabel("Demo alias").fill(alias);
+  await page.getByLabel("Service ZCTA (study area)").selectOption("00111");
+  await page.getByLabel("Payer (as reported)").selectOption({ label: "Cascade Commercial (DEMO)" });
+  await page.getByTestId("synthetic-ack").check();
+  await page.getByTestId("submit-inquiry").click();
+  await expect(page.getByTestId("match-results")).toBeVisible();
+  await page.goto(`/intake?q=${encodeURIComponent(alias)}`);
+  await page.getByTestId("inquiry-row").first().click();
+  const south = page.getByTestId("match-south");
+  await expect(south).toHaveAttribute("data-eligibility", "potential_fit");
+  // only verified potential fits offer a reservation
+  await expect(page.getByTestId("match-west").getByTestId("reserve-hold")).toHaveCount(0);
+  await south.getByTestId("reserve-hold").click();
+  await expect(south.getByTestId("hold-reserved-badge")).toContainText("not an appointment");
+  const holds = page.getByTestId("holds");
+  await expect(holds.getByTestId("hold-reserved")).toContainText("Reserved — not an appointment");
+  await expect(holds).toContainText("It is not an appointment");
+  await expect(page.getByTestId("timeline")).toContainText("Capacity Hold Reserved");
+  await expect(page.getByTestId("reserve-hold")).toHaveCount(0);
+  await shot(page, "08-capacity-hold");
+  await holds.getByTestId("release-hold").click();
+  await expect(holds.getByTestId("hold-released")).toBeVisible();
+  await expect(page.getByTestId("timeline")).toContainText("Capacity Hold Released");
+  await expect(south.getByTestId("reserve-hold")).toBeVisible();
+});

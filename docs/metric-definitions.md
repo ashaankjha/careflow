@@ -1,6 +1,6 @@
 # Metric definitions
 
-All KPIs are computed on request from `inquiry_events` (immutable) and current verified capacity, in `packages/db/src/services/metrics.ts`. `daily_metrics` holds **derived snapshots** (mission evidence, `compute-daily-metrics` job) and is never a source of truth. Every KPI shares the same filters — window `[from, to)`, optional site (`inquiries.center_id`) and source channel — so numerators and denominators move together (tested in `operations.test.ts`).
+All KPIs are computed on request from `inquiry_events` (immutable) and verified capacity (current, or the capacity version in force at inquiry time for capacity-fit), in `packages/db/src/services/metrics.ts`. `daily_metrics` holds **derived snapshots** (mission evidence, `compute-daily-metrics` job) and is never a source of truth. Every KPI shares the same filters — window `[from, to)`, optional site (`inquiries.center_id`) and source channel — so numerators and denominators move together (tested in `operations.test.ts`).
 
 Common filter fragment (`i` = inquiries):
 
@@ -53,13 +53,20 @@ Snapshot as of now: active inquiries (pre-start stages) whose `now − stage_ent
 
 ## capacity_fit_rate
 
-Numerator: cohort inquiries for which the matcher returns at least one `potential_fit` against the **current** verified capacity snapshot. Denominator: cohort inquiries with the required inputs (ZIP in the study area, payer recorded, ≥1 mode, ≥1 time window). Missing-input inquiries are reported separately (`missingInputs`), never silently dropped.
+Numerator: cohort inquiries for which the matcher returns at least one `potential_fit` **as of the inquiry's `created_at`**. Denominator: cohort inquiries with the required inputs (ZIP in the study area, payer recorded, ≥1 mode, ≥1 time window). Missing-input inquiries are reported separately (`missingInputs`), never silently dropped.
 
-* Bias: evaluated against today’s capacity, not the capacity at inquiry time (capacity history is not versioned in the MVP).
+As-of semantics (`asOf: "inquiry_created_at"` in the API response):
+
+* **Capacity sheet** — the `capacity_versions` row whose `[valid_from, valid_to)` contains `created_at`, with its `staff_capacity_window_versions` rows and rules snapshot. Every capacity save appends a version (and closes the previous one), so editing capacity today never rewrites a past cohort's fit (tested in `capacity-history.test.ts`).
+* **Verification freshness** — a window counts as verified if its recorded `verified_at` was within `capacityVerificationMaxAgeDays` *at `created_at`*.
+* **Holds** — holds whose `created_at ≤ t < min(released_at, expires_at)` subtract hours and count against the weekly new-start limit.
+* **Weekly new starts** — verified starts in `(t − 7 d, t]`.
+* Not versioned (applied as currently recorded): payer participation status (verification time capped at `t`), site profile (radius, modes, age policy) and the onboarding backlog (affects the score only, never eligibility). The current tenant policy is used.
+* A site with no capacity version in force at `t` is evaluated with no recorded capacity (verification needed); the count of such inquiries is reported as `withoutCapacityVersion`. The seed backfills a version history (ops re-attesting the same sheet every 28 days) that covers every seeded inquiry, so the seeded numbers equal the previous current-capacity evaluation.
 
 ## verified_weekly_direct_hours_available
 
-Per site: `floor(min(verified RBT hours − proposed/reserved hold hours, (verified BCBA hours − BCBA hold hours) / r))`, where `r` is the verified site supervision ratio; `0` if `starts in last 7 days + active holds ≥ max_new_starts_per_week`; `null` (“unverified”) if no verified supervision rule exists. Windows are “verified” only if `verified_at` is within `capacityVerificationMaxAgeDays` (default 30). Unverified/stale hours are shown separately as *pending*.
+Current snapshot (not as-of). Per site: `floor(min(verified RBT hours − proposed/reserved hold hours, (verified BCBA hours − BCBA hold hours) / r))`, where `r` is the verified site supervision ratio; `0` if `starts in last 7 days + active holds ≥ max_new_starts_per_week`; `null` (“unverified”) if no verified supervision rule exists. Windows are “verified” only if `verified_at` is within `capacityVerificationMaxAgeDays` (default 30). Unverified/stale hours are shown separately as *pending*. Released holds and holds past `expires_at` never subtract (lazy expiry at read time).
 
 ## referral_source_attribution
 
@@ -68,7 +75,7 @@ Inquiries (and how many have a verified start) grouped by first-party referral c
 ## Known biases and caveats
 
 * **Right censoring** — recent cohorts have had less time to start; typical inquiry-to-start in the seed is ~38 days.
-* **Current-capacity evaluation** of historical cohorts (see capacity_fit_rate).
+* **Partially versioned history** — capacity-fit uses the capacity version in force at inquiry time, but payer participation and site profile are applied as currently recorded (see capacity_fit_rate).
 * **Small numbers** — per-site, per-week numbers are small; the UI shows denominators everywhere and experiments refuse intervals below the configured minimum N.
 * **Synthetic data** — all values in the demo come from a deterministic simulator and are labelled synthetic.
 * **Time zones** — timestamps are stored in UTC; weekly buckets use the organization’s time zone.

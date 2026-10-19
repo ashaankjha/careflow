@@ -10,6 +10,8 @@ export const tenantPolicySchema = z.object({
   payerVerificationMaxAgeDays: z.number().int().positive().default(180),
   capacityVerificationMaxAgeDays: z.number().int().positive().default(30),
   planningDefaultDirectHours: z.number().positive().default(10),
+  /** Reserved capacity holds expire after this many days unless released earlier (PRD §8). */
+  holdTtlDays: z.number().int().positive().max(60).default(7),
   stallThresholdDays: z
     .record(z.string(), z.number().positive())
     .default({

@@ -357,10 +357,77 @@ export const capacityHolds = pgTable(
     status: holdStatusEnum("status").notNull().default("proposed"),
     expiresAt: ts("expires_at").notNull(),
     assignedBy: uuid("assigned_by"),
+    /** Set when staff reserve verified capacity (locked transaction). Reserved is not an appointment. */
+    reservedAt: ts("reserved_at"),
+    releasedAt: ts("released_at"),
+    releasedBy: uuid("released_by"),
+    /** staff_released | expired | superseded */
+    releaseReason: text("release_reason"),
   },
   (t) => [
     foreignKey({ columns: [t.organizationId, t.inquiryId], foreignColumns: [inquiries.organizationId, inquiries.id] }).onDelete("cascade"),
     foreignKey({ columns: [t.organizationId, t.centerId], foreignColumns: [centers.organizationId, centers.id] }).onDelete("cascade"),
+    uniqueIndex("capacity_holds_one_reserved_uq").on(t.inquiryId).where(sql`status = 'reserved'`),
+    index("capacity_holds_center_idx").on(t.organizationId, t.centerId, t.status),
+    check("capacity_holds_reserved_at_ck", sql`${t.status} <> 'reserved' or ${t.reservedAt} is not null`),
+    check("capacity_holds_released_at_ck", sql`${t.status} <> 'released' or ${t.releasedAt} is not null`),
+    check("capacity_holds_hours_ck", sql`${t.directWeeklyHoursEstimate} >= 0 and ${t.bcbaWeeklyHoursEstimate} >= 0`),
+  ],
+);
+
+/**
+ * Capacity history (risk R8). One immutable header per capacity save with the
+ * rules snapshot; [valid_from, valid_to) is the period the sheet was in force.
+ * valid_to is null for the current version.
+ */
+export const capacityVersions = pgTable(
+  "capacity_versions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+    centerId: uuid("center_id").notNull(),
+    version: integer("version").notNull(),
+    validFrom: ts("valid_from").notNull(),
+    validTo: ts("valid_to"),
+    rules: jsonb("rules").notNull().default([]),
+    attested: boolean("attested").notNull().default(false),
+    recordedBy: uuid("recorded_by"),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    unique("capacity_versions_org_id_uq").on(t.organizationId, t.id),
+    unique("capacity_versions_center_version_uq").on(t.organizationId, t.centerId, t.version),
+    foreignKey({ name: "capacity_versions_center_fk", columns: [t.organizationId, t.centerId], foreignColumns: [centers.organizationId, centers.id] }).onDelete("cascade"),
+    uniqueIndex("capacity_versions_one_open_uq").on(t.centerId).where(sql`valid_to is null`),
+    index("capacity_versions_center_idx").on(t.organizationId, t.centerId, t.validFrom),
+    check("capacity_versions_range_ck", sql`${t.validTo} is null or ${t.validTo} >= ${t.validFrom}`),
+  ],
+);
+
+/** Staff windows as recorded in a capacity version (append-only). */
+export const staffCapacityWindowVersions = pgTable(
+  "staff_capacity_window_versions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+    centerId: uuid("center_id").notNull(),
+    capacityVersionId: uuid("capacity_version_id").notNull(),
+    role: staffRoleEnum("role").notNull(),
+    dayOfWeek: smallint("day_of_week").notNull(),
+    startMinute: smallint("start_minute").notNull(),
+    endMinute: smallint("end_minute").notNull(),
+    weeklyAvailableHours: doublePrecision("weekly_available_hours").notNull(),
+    serviceMode: text("service_mode").notNull(),
+    verifiedAt: ts("verified_at"),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    foreignKey({ name: "scwv_version_fk", columns: [t.organizationId, t.capacityVersionId], foreignColumns: [capacityVersions.organizationId, capacityVersions.id] }).onDelete("cascade"),
+    foreignKey({ name: "scwv_center_fk", columns: [t.organizationId, t.centerId], foreignColumns: [centers.organizationId, centers.id] }).onDelete("cascade"),
+    index("scwv_version_idx").on(t.organizationId, t.capacityVersionId),
+    check("scwv_day_ck", sql`${t.dayOfWeek} between 0 and 6`),
+    check("scwv_minutes_ck", sql`${t.startMinute} >= 0 and ${t.endMinute} <= 1440 and ${t.endMinute} > ${t.startMinute}`),
+    check("scwv_hours_ck", sql`${t.weeklyAvailableHours} >= 0`),
   ],
 );
 
