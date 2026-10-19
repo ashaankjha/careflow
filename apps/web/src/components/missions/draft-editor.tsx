@@ -13,7 +13,7 @@ import { Tip } from "@/components/ui/tooltip";
 import { api, ApiError } from "@/lib/client/api";
 import { titleCase } from "@/lib/format";
 
-type Draft = { id: string; kind: string; title: string; bodyMd: string; revision: number; approvalStatus: string; validation: ValidationResult; generator: string; approvedAt: string | null };
+type Draft = { id: string; kind: string; locale: string; title: string; bodyMd: string; revision: number; approvalStatus: string; validation: ValidationResult; generator: string; approvedAt: string | null };
 
 export function DraftEditor({ id, perms, onClose }: { id: string; perms: { edit: boolean; approveDraft: boolean; export: boolean }; onClose: () => void }) {
   const [d, setD] = useState<Draft | null>(null);
@@ -45,7 +45,7 @@ export function DraftEditor({ id, perms, onClose }: { id: string; perms: { edit:
       wide
       onOpenChange={(o) => !o && onClose()}
       title={d?.title ?? "Draft"}
-      description={d && <span className="flex flex-wrap items-center gap-2"><Badge tone={d.approvalStatus === "approved" ? "good" : d.approvalStatus === "needs_review" ? "warn" : "neutral"} data-testid="draft-status">{titleCase(d.approvalStatus)}</Badge><span>Revision {d.revision} · generator: {d.generator === "template" ? "deterministic template (AI disabled)" : "AI paraphrase, validated"}</span></span>}
+      description={d && <span className="flex flex-wrap items-center gap-2"><Badge tone={d.approvalStatus === "approved" ? "good" : d.approvalStatus === "needs_review" ? "warn" : "neutral"} data-testid="draft-status">{titleCase(d.approvalStatus)}</Badge>{d.locale !== "en-US" && <Badge tone="blue" data-testid="draft-locale-badge">{d.locale === "es-US" ? "Spanish (es-US)" : d.locale}</Badge>}<span>Revision {d.revision} · generator: {d.generator === "template" ? "deterministic template (AI disabled)" : "AI paraphrase, validated"}</span></span>}
       footer={d && (
         <>
           <Tip content="Sending is disabled in the MVP. Drafts never auto-send or auto-publish.">
@@ -76,13 +76,18 @@ export function DraftEditor({ id, perms, onClose }: { id: string; perms: { edit:
               </div>
             )}
           </div>
+          {d.locale === "es-US" && (
+            <div className="mb-3 rounded-lg border border-warn/30 bg-warn-soft px-3 py-2 text-[12.5px] text-warn" data-testid="draft-translation-note">
+              <span className="flex items-center gap-1.5"><AlertTriangle className="h-4 w-4" />Machine-authored Spanish template. Have a qualified human translator review it before any real use; the claim validator checks Spanish wording but is not a translation review.</span>
+            </div>
+          )}
           <Tabs defaultValue="preview">
             <TabsList><TabsTrigger value="preview">Preview</TabsTrigger>{perms.edit && <TabsTrigger value="edit">Edit Markdown</TabsTrigger>}</TabsList>
             <TabsContent value="preview" className="mt-3">
-              <div className="prose-draft rounded-lg border border-line bg-surface p-4" dangerouslySetInnerHTML={{ __html: markdownToHtml(body) }} />
+              <div lang={d.locale} className="prose-draft rounded-lg border border-line bg-surface p-4" dangerouslySetInnerHTML={{ __html: markdownToHtml(body) }} />
             </TabsContent>
             <TabsContent value="edit" className="mt-3">
-              <Textarea aria-label="Draft markdown" rows={18} className="font-mono text-[12px]" value={body} onChange={(e) => setBody(e.target.value)} data-testid="draft-body" />
+              <Textarea lang={d.locale} aria-label="Draft markdown" rows={18} className="font-mono text-[12px]" value={body} onChange={(e) => setBody(e.target.value)} data-testid="draft-body" />
               <p className="mt-1 text-[11.5px] text-ink-3">Edits reset approval and are re-validated against current verified records on save.</p>
             </TabsContent>
           </Tabs>
