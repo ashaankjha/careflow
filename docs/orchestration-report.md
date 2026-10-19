@@ -40,7 +40,7 @@ The seeded acceptance chain is unchanged and covered by E2E workflows 3, 5 and 7
 
 ## Deferred / remaining limitations (and why)
 
-- **Not verified on GitHub's runners or Docker.** The CI workflow is committed, and its YAML and steps were validated locally, but it has never run on GitHub. `docker-compose.yml` was reviewed by reading only, because there is no Docker daemon here.
+- **CI runs green on GitHub Actions** for this branch (runs on pushes of `97caf6f` and `f8557e7` succeeded: migrate, seed, lint, typecheck, test and E2E against a Postgres 16 service). **Docker is not verified:** `docker-compose.yml` was reviewed by reading only, because there is no Docker daemon here.
 - **Jobs CLI still runs as the owner role.** A scoped jobs role needs its own policy design. This is listed under R1 residuals.
 - **The demo-reset button uses the owner connection.** It purges both demo tenants. It can be turned off with `DEMO_RESET_ENABLED=false`, which is required before any shared deployment.
 - **Rate limiter is not a WAF.** The sign-in IP key comes from `X-Forwarded-For` and can be spoofed without a trusted proxy. There is no per-account lockout.
