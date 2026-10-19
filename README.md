@@ -122,4 +122,4 @@ US Census ACS 2024 5-year (B01001), CMS NPPES, IDEA Section 618 (context only) â
 | ![Intake drawer](docs/screenshots/02-intake-drawer-matches.png) | ![Capacity after edit](docs/screenshots/03b-capacity-after.png) |
 | ![Missions](docs/screenshots/05b-missions.png) | ![Market map](docs/screenshots/06-market-map.png) |
 | ![Approved packet](docs/screenshots/05a-approved-packet.png) | ![Experiment](docs/screenshots/05c-experiment.png) |
-| ![Equity audit](docs/screenshots/08-equity-audit.png) | |
+| ![Equity audit](docs/screenshots/09-equity-audit.png) | |

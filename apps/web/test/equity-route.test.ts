@@ -1,8 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 process.env.DATABASE_URL = process.env.TEST_DATABASE_URL ?? "postgres://postgres:postgres@localhost:5432/careflow_test";
+process.env.APP_DATABASE_URL = process.env.TEST_APP_DATABASE_URL ?? "postgres://careflow_app:careflow_app_dev_only@localhost:5432/careflow_test";
 
-const { createDb, login, seedDatabase } = await import("@careflow/db");
+const { createDb, getAppDb, login, seedDatabase } = await import("@careflow/db");
 const { GET } = await import("@/app/api/v1/equity/route");
 
 const ORIGIN = "http://localhost:3000";
@@ -11,7 +12,8 @@ const tokens: Record<string, string> = {};
 
 beforeAll(async () => {
   await seedDatabase(seedDb);
-  for (const role of ["growth", "ops", "intake", "viewer"]) tokens[role] = (await login(seedDb, `${role}@harbor.demo`, "demo-pass-2026"))!.token;
+  await client`delete from rate_limit_buckets`;
+  for (const role of ["growth", "ops", "intake", "viewer"]) tokens[role] = (await login(getAppDb(), `${role}@harbor.demo`, "demo-pass-2026"))!.token;
 });
 afterAll(() => client.end());
 
