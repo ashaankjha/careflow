@@ -37,7 +37,7 @@ export function ReferralsWorkspace({ partners, packets, qr, canManage, tz }: { p
                 <tr key={p.id} className="border-b border-line/70 last:border-0">
                   <td className="px-5 py-2.5">
                     <div className="font-medium">{p.businessName}</div>
-                    <div className="text-[11.5px] text-ink-3">{titleCase(p.category)} · {p.location}{p.sourceUrl && <> · <a className="text-accent hover:underline" href={p.sourceUrl} target="_blank" rel="noreferrer noopener">listing <ExternalLink className="inline h-3 w-3" /></a></>}</div>
+                    <div className="text-[11.5px] text-ink-3">{titleCase(p.category)} · {p.location}{p.sourceUrl && <> · <a className="text-accent underline underline-offset-2" href={p.sourceUrl} target="_blank" rel="noreferrer noopener">listing <ExternalLink className="inline h-3 w-3" /></a></>}</div>
                   </td>
                   <td className="px-3 py-2.5"><Badge tone={REL_TONE[p.relationshipStatus] ?? "neutral"}>{titleCase(p.relationshipStatus)}</Badge></td>
                   <td className="px-3 py-2.5 text-ink-2">{titleCase(p.contactPermissionStatus)}</td>

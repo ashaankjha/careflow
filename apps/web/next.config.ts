@@ -7,20 +7,6 @@ config({ path: resolve(process.cwd(), "../../.env") });
 
 const isDev = process.env.NODE_ENV !== "production";
 
-// First-party only: no third-party scripts, pixels or session recorders (PRD §15).
-const csp = [
-  "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
-  "font-src 'self' data:",
-  "connect-src 'self'",
-  "frame-ancestors 'none'",
-  "form-action 'self'",
-  "base-uri 'self'",
-  "object-src 'none'",
-].join("; ");
-
 const nextConfig: NextConfig = {
   transpilePackages: ["@careflow/core", "@careflow/db", "@careflow/connectors"],
   serverExternalPackages: ["postgres"],
@@ -30,8 +16,8 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/:path*",
+        // Content-Security-Policy is set per request (with a nonce) in src/middleware.ts.
         headers: [
-          { key: "Content-Security-Policy", value: csp },
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "X-Frame-Options", value: "DENY" },
           { key: "Referrer-Policy", value: "no-referrer" },

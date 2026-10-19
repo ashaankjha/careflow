@@ -98,13 +98,13 @@ export function MarketWorkspace({ data, centers, canRefresh, tz }: { data: Data;
           actions={
             <Tabs value={layer} onValueChange={(v) => setLayer(v as LayerKey)}>
               <TabsList aria-label="Map layer" className="flex-wrap">
-                {(Object.keys(LAYERS) as LayerKey[]).map((k) => <TabsTrigger key={k} value={k}>{LAYERS[k].label}</TabsTrigger>)}
+                {(Object.keys(LAYERS) as LayerKey[]).map((k) => <TabsTrigger key={k} value={k} aria-controls="market-map">{LAYERS[k].label}</TabsTrigger>)}
               </TabsList>
             </Tabs>
           }
         />
         <CardBody>
-          <svg viewBox={`${minX} ${minY} ${maxX - minX} ${maxY - minY}`} className="h-auto w-full max-h-[460px]" role="img" aria-label={`Hex tile map of ${tiles.length} demo ZCTAs colored by ${L.label}`} data-testid="market-map">
+          <svg viewBox={`${minX} ${minY} ${maxX - minX} ${maxY - minY}`} id="market-map" className="h-auto w-full max-h-[460px]" role="group" aria-label={`Hex tile map of ${tiles.length} demo ZCTAs colored by ${L.label}`} data-testid="market-map">
             <defs>
               <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
                 <rect width="6" height="6" fill="#F1EEE8" />
@@ -115,11 +115,13 @@ export function MarketWorkspace({ data, centers, canRefresh, tz }: { data: Data;
             {pts.map(({ z, x, y }) => {
               const v = L.get(z);
               const isSel = sel?.zcta5 === z.zcta5;
+              const shown = v == null ? (z.internalInquiriesSuppressed && layer === "inquiries" ? "<5" : "n/a") : L.fmt(v);
               return (
-                <g key={z.zcta5} tabIndex={0} role="button" aria-label={`${z.zcta5} ${z.label}: ${v == null ? "no value" : L.fmt(v)}`} onMouseEnter={() => setFocus(z.zcta5)} onFocus={() => setFocus(z.zcta5)} onClick={() => setFocus(z.zcta5)} className="cursor-pointer outline-none" data-testid={`tile-${z.zcta5}`}>
+                <g key={z.zcta5} tabIndex={0} role="button" aria-label={`${z.zcta5} ${shown}, ${z.label}`} onMouseEnter={() => setFocus(z.zcta5)} onFocus={() => setFocus(z.zcta5)} onClick={() => setFocus(z.zcta5)} className="cursor-pointer outline-none" data-testid={`tile-${z.zcta5}`}>
                   <polygon points={hexPath(x, y, R - 1)} fill={v == null ? "url(#hatch)" : RAMP[bin(v)]} stroke={isSel ? "#0F1B2D" : "#FFFFFF"} strokeWidth={isSel ? 3 : 2} />
                   <text x={x} y={y - 18} textAnchor="middle" className="pointer-events-none" fontSize="11" fontWeight={600} fill={v != null && bin(v) >= 3 ? "#FFFFFF" : "#0F1B2D"}>{z.zcta5}</text>
-                  <text x={x} y={y - 4} textAnchor="middle" className="pointer-events-none" fontSize="10" fill={v != null && bin(v) >= 3 ? "#FFFFFFCC" : "#3D4A5C"}>{v == null ? (z.internalInquiriesSuppressed && layer === "inquiries" ? "<5" : "n/a") : L.fmt(v)}</text>
+                  {" " /* keeps the two labels separate words in the accessible-name check */}
+                  <text x={x} y={y - 4} textAnchor="middle" className="pointer-events-none" fontSize="10" fill={v != null && bin(v) >= 3 ? "#FFFFFFCC" : "#3D4A5C"}>{shown}</text>
                 </g>
               );
             })}

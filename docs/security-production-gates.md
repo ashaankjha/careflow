@@ -14,7 +14,7 @@
 | Integrity | Immutable `inquiry_events` and `audit_logs` (triggers); event-order checks; idempotency keys; optimistic locking on capacity and drafts | `intake.test.ts`, `tenancy.test.ts` |
 | CSRF | Same-origin check on all mutations, SameSite cookies, JSON-only bodies | `api.test.ts` |
 | Rate limiting | Per-user and per-IP token buckets (in-memory) | `rate-limit.ts` |
-| Headers | CSP (`default-src 'self'`, no third-party script/connect), `frame-ancestors 'none'`, nosniff, `Referrer-Policy: no-referrer`, Permissions-Policy, HSTS in production | `next.config.ts` |
+| Headers | Per-request nonce CSP (`script-src 'self' 'nonce-…' 'strict-dynamic'`, no `'unsafe-inline'`/`'unsafe-eval'` scripts in production; `default-src 'self'`, no third-party script/connect, `object-src 'none'`, `frame-ancestors 'none'`); `style-src` keeps `'unsafe-inline'` for React/Radix/Recharts style attributes; nosniff, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, Permissions-Policy, HSTS in production | `middleware.ts` (CSP), `next.config.ts` (static headers), `middleware.test.ts`, `security.spec.ts` |
 | Tracking | No analytics, pixels, session recorders or ad tags anywhere; no identifiers in query strings sent off-site | CSP + code review |
 | Logging | Server logs contain error class/code + request id only — never request bodies | `api.test.ts` |
 | Audit | Reads of inquiry details, exports, changes, approvals, denied attempts, send attempts, resets | `audit.ts`, Settings → Audit history |
@@ -29,7 +29,7 @@
 |---|---|---|---|
 | R1 | App connects as DB owner → RLS bypassed | Service scoping + composite FKs + tests | **Blocker**: run as non-owner role; set `app.current_org` per transaction; `FORCE ROW LEVEL SECURITY` |
 | R2 | In-memory rate limiter resets per process | Fine for single-node demo | Shared store (Redis/DB) behind a WAF |
-| R3 | CSP allows `'unsafe-inline'` scripts (Next.js bootstrap) | No third-party origins | Nonce-based CSP |
+| R3 | Inline-script injection | Nonce-based CSP with `'strict-dynamic'` set in middleware; every page is dynamically rendered so each response carries a fresh nonce; E2E asserts no `'unsafe-inline'` in `script-src`, nonces on Next scripts and no CSP console violations | `style-src 'unsafe-inline'` remains (style attributes); add CSP violation reporting (`report-to`) and review before PHI |
 | R4 | Demo passwords are public | Synthetic tenant only | SSO/OIDC with MFA; disable seeded users |
 | R5 | No encryption-at-rest configuration in repo | Local dev only | Managed Postgres with KMS keys, TLS everywhere, backups tested |
 | R6 | Audit log lives in the same DB | Immutable trigger | Ship to append-only external store; retention policy |

@@ -37,3 +37,31 @@ test("unauthenticated API calls get the error envelope", async ({ request }) => 
   expect(body.error.code).toBe("UNAUTHENTICATED");
   expect(body.error.requestId).toBeTruthy();
 });
+
+test("pages are served with a per-request nonce CSP and still hydrate", async ({ page }) => {
+  const violations: string[] = [];
+  page.on("console", (m) => {
+    if (/Content Security Policy/i.test(m.text())) violations.push(m.text());
+  });
+  const res = await page.goto("/login");
+  const csp = res!.headers()["content-security-policy"]!;
+  const scriptSrc = csp.split(";").map((d) => d.trim()).find((d) => d.startsWith("script-src "))!;
+  const nonce = /'nonce-([A-Za-z0-9+/=]+)'/.exec(scriptSrc)?.[1];
+  expect(nonce, "script-src carries a nonce").toBeTruthy();
+  expect(scriptSrc).toContain("'strict-dynamic'");
+  expect(scriptSrc).not.toContain("'unsafe-inline'");
+  expect(scriptSrc).not.toContain("'unsafe-eval'");
+  expect(csp).toContain("frame-ancestors 'none'");
+  expect(res!.headers()["x-frame-options"]).toBe("DENY");
+  // Next.js stamps the nonce on its own scripts
+  const stamped = await page.locator("script[nonce]").count();
+  expect(stamped).toBeGreaterThan(0);
+  // nonces are fresh per request
+  const again = await page.request.get("/login");
+  expect(again.headers()["content-security-policy"]).not.toContain(nonce!);
+  // hydration works under the policy: the client-side login flow navigates
+  await loginAs(page, "admin");
+  const appCsp = (await page.request.get("/")).headers()["content-security-policy"];
+  expect(appCsp).toMatch(/script-src 'self' 'nonce-[^']+' 'strict-dynamic'/);
+  expect(violations).toEqual([]);
+});

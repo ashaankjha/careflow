@@ -26,11 +26,12 @@ This log records judgement calls made while implementing the PRD without routine
 
 * **RLS** policies exist and are tested with a non-owner role, but the app itself connects as the owner, so RLS is defense-in-depth rather than the primary control in this demo (see security gates R1).
 * **Rate limiting** is in-memory per process.
-* **CSP** allows inline scripts for Next.js bootstrapping (no third-party origins).
+* **CSP** uses a per-request script nonce (`'strict-dynamic'`, no inline/eval scripts in production), which forces every page to render dynamically (no static prerendering). Styles still allow `'unsafe-inline'` because React/Radix/Recharts set inline `style` attributes.
+* **No route-level loading skeleton.** `(app)/loading.tsx` was removed: in the production build (Next 15.5) that loading boundary made same-page search-param navigations — every filter change on Overview — silently hang a few seconds after page load (reproduced on the pre-change build; flaky E2E workflow 1). Pages render when data is ready instead.
 * **Capacity history** is not versioned, so capacity-fit for past cohorts uses current capacity (documented in metric definitions).
 * **Experiment intervals** for partner/site-week randomization do not adjust for clustering (caveat shown).
 * **Markdown rendering** for drafts uses a small escaping renderer (headings, lists, emphasis, code) rather than a full CommonMark library.
-* **Turborepo** runs package tasks; there is no remote cache or CI workflow file committed (commands are documented; any CI can run them).
+* **Turborepo** runs package tasks without a remote cache. CI is a single GitHub Actions job (`.github/workflows/ci.yml`: Postgres 16 service, migrate + seed, lint, typecheck, tests, Playwright E2E with the report uploaded on failure); it has not been tuned for speed (no sharding or build caching).
 
 ## Known limitations / unfinished
 
@@ -40,8 +41,8 @@ This log records judgement calls made while implementing the PRD without routine
 * No equity-audit panel across payer groups (described in experiment design, not built).
 * Single locale (`en-US`); drafts are English only.
 * Consent records table is a schema placeholder only.
-* Dark mode is not implemented (desktop-first light theme per PRD visual language).
-* Accessibility was checked via keyboard E2E and semantic markup, not a full WCAG audit.
+* Dark mode is not implemented (desktop-first light theme per PRD visual language). It is not a cheap token swap here: the market tile map, trend chart and logo use hard-coded SVG/hex colours, and the sidebar/primary buttons pair `bg-ink` with `text-white`.
+* Accessibility: every screen (login, overview, market, referrals, intake with an open inquiry drawer and the add-inquiry dialog, capacity incl. the capacity editor, missions incl. a draft editor, experiments, settings, referral-packet print page, not-found) passes automated axe-core WCAG 2.1 A/AA checks with no rule exceptions (`e2e/a11y.spec.ts`), plus a keyboard/focus-ring E2E. Automated checks catch only a subset of WCAG issues; there has been no manual screen-reader, zoom/reflow, or cognitive review, so this is not a full WCAG audit or a conformance claim. Only the light scheme and the desktop viewport are scanned.
 * LLM adapter is implemented and unit-tested with mocked responses but has not been exercised against a live provider.
 
 ## Future phases (not shipped — PRD §20)
