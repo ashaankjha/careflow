@@ -71,9 +71,13 @@ The login page has one-click persona buttons.
 | `pnpm jobs <name>` | Run a cron-compatible job manually: `compute-daily-metrics`, `generate-missions`, `expire-holds`, `refresh-market` |
 | `pnpm lint` · `pnpm typecheck` | ESLint (flat config) · strict TypeScript, all packages |
 | `pnpm test` | Vitest: core domain, connectors, DB integration (uses `TEST_DATABASE_URL`), API wrapper |
-| `pnpm test:e2e` | Playwright: production build, 7 demo workflows + capacity-hold reserve/release + security + keyboard + mobile; writes `docs/screenshots/` |
+| `pnpm test:e2e` | Playwright: production build, 7 demo workflows + capacity-hold reserve/release + equity audit + security (RBAC, nonce CSP) + keyboard + mobile + axe WCAG 2.1 A/AA scan of every screen; writes `docs/screenshots/` |
 
 `pnpm test` creates/migrates/reseeds `careflow_test` (it refuses any URL without “test” in it). `pnpm test:e2e` reseeds the main database first.
+
+**CI:** `.github/workflows/ci.yml` runs on every push and pull request: PostgreSQL 16 service, `pnpm install --frozen-lockfile`, migrate + seed, lint, typecheck, `pnpm test`, then `pnpm test:e2e` (Playwright report uploaded as an artifact on failure). No secrets or API keys are needed.
+
+**Accessibility:** `apps/web/e2e/a11y.spec.ts` runs axe-core (WCAG 2.1 A/AA tags) on every screen with no rule exceptions. That is an automated check, not a full WCAG audit.
 
 ## Architecture
 

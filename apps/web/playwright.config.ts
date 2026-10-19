@@ -2,7 +2,8 @@ import { defineConfig, devices } from "@playwright/test";
 import { existsSync } from "node:fs";
 
 const PORT = Number(process.env.E2E_PORT ?? 3100);
-const chromiumPath = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
+// Use the sandbox's preinstalled Chromium when present; elsewhere (CI) use Playwright's own browser.
+const chromiumPath = "/opt/pw-browsers/chromium";
 
 export default defineConfig({
   testDir: "./e2e",

@@ -12,7 +12,7 @@ export default {
         canvas: "#F7F5F1",
         surface: "#FFFFFF",
         line: "#E7E3DC",
-        ink: { DEFAULT: "#0F1B2D", 2: "#3D4A5C", 3: "#6B7686", 4: "#98A1AD" },
+        ink: { DEFAULT: "#0F1B2D", 2: "#3D4A5C", 3: "#4F5A6A", 4: "#5D6878" },
         accent: { DEFAULT: "#1F5FBF", soft: "#E8F0FB", ink: "#174A96" },
         teal: { DEFAULT: "#0F766E", soft: "#E3F3F1" },
         good: { DEFAULT: "#0B7A43", soft: "#E5F4EC" },

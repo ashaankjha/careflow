@@ -97,14 +97,14 @@ export function CapacityEditor({ sheet, payers, onClose, onSaved }: { sheet: She
         {rules.map((r, i) => (
           <div key={i} className="mb-2 grid grid-cols-2 gap-2 rounded-lg border border-line p-3 sm:grid-cols-4">
             <div className="col-span-2 sm:col-span-1">
-              <Label>Applies to</Label>
-              <Select value={r.payerId ?? ""} onChange={(e) => setRules((x) => x.map((y, j) => (j === i ? { ...y, payerId: e.target.value || null } : y)))}>
+              <Label htmlFor={`rule-${i}-payer`}>Applies to</Label>
+              <Select id={`rule-${i}-payer`} value={r.payerId ?? ""} onChange={(e) => setRules((x) => x.map((y, j) => (j === i ? { ...y, payerId: e.target.value || null } : y)))}>
                 <option value="">All payers (site default)</option>
                 {payers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </Select>
             </div>
-            <div><Label>BCBA h per direct h</Label><Input type="number" step={0.025} min={0} max={1} value={r.requiredBcbaHoursPerDirectHour ?? ""} onChange={(e) => setRules((x) => x.map((y, j) => (j === i ? { ...y, requiredBcbaHoursPerDirectHour: e.target.value === "" ? null : Number(e.target.value) } : y)))} /></div>
-            <div><Label>Max new starts / wk</Label><Input type="number" min={0} value={r.maxNewStartsPerWeek ?? ""} onChange={(e) => setRules((x) => x.map((y, j) => (j === i ? { ...y, maxNewStartsPerWeek: e.target.value === "" ? null : Number(e.target.value) } : y)))} /></div>
+            <div><Label htmlFor={`rule-${i}-bcba`}>BCBA h per direct h</Label><Input id={`rule-${i}-bcba`} type="number" step={0.025} min={0} max={1} value={r.requiredBcbaHoursPerDirectHour ?? ""} onChange={(e) => setRules((x) => x.map((y, j) => (j === i ? { ...y, requiredBcbaHoursPerDirectHour: e.target.value === "" ? null : Number(e.target.value) } : y)))} /></div>
+            <div><Label htmlFor={`rule-${i}-max`}>Max new starts / wk</Label><Input id={`rule-${i}-max`} type="number" min={0} value={r.maxNewStartsPerWeek ?? ""} onChange={(e) => setRules((x) => x.map((y, j) => (j === i ? { ...y, maxNewStartsPerWeek: e.target.value === "" ? null : Number(e.target.value) } : y)))} /></div>
             <label className="flex items-end gap-2 pb-2 text-[12.5px]"><input type="checkbox" className="accent-[#1F5FBF]" checked={r.isVerified} onChange={(e) => setRules((x) => x.map((y, j) => (j === i ? { ...y, isVerified: e.target.checked } : y)))} />Rule verified</label>
           </div>
         ))}
