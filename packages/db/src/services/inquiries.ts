@@ -14,7 +14,7 @@ import {
   validateCsv,
   type Stage,
 } from "@careflow/core";
-import { and, asc, count, desc, eq, gte, ilike, inArray, lt, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, inArray, or, sql, type SQL } from "drizzle-orm";
 import type { z } from "zod";
 import type { Db, Executor } from "../client";
 import { centers, inquiries, inquiryEvents, organizations, payers, referralCodes, referralPartners, users } from "../schema";
@@ -490,4 +490,3 @@ export async function listIntakeOwners(db: Executor, ctx: Ctx) {
     .orderBy(asc(users.displayName));
 }
 
-export const _internal = { gte, lt };

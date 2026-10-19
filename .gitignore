@@ -11,4 +11,3 @@ playwright-report
 apps/web/e2e/.auth
 var/
 .DS_Store
-packages/db/src/scripts/debug-*.ts

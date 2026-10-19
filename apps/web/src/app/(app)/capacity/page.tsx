@@ -26,7 +26,6 @@ export default async function CapacityPage() {
         zctas={market.zctas.filter((z) => z.demoFixture).map((z) => ({ zcta5: z.zcta5, label: z.label }))}
         canEdit={can(s.user.role, "capacity:edit")}
         canEditPayers={can(s.user.role, "payer:edit")}
-        tz={s.org.timezone}
       />
     </>
   );

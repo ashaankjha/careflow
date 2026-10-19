@@ -10,7 +10,7 @@
     "./*": "./src/*.ts"
   },
   "scripts": {
-    "lint": "eslint src",
+    "lint": "eslint src test",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run"
   },

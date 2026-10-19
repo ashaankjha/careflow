@@ -18,7 +18,7 @@ import { CapacityEditor, PayerEditor, type Sheet } from "./editors";
 const PAYER_TONE = { verified_accepted: "good", not_accepted: "bad", unknown: "neutral" } as const;
 const PAYER_LABEL = { verified_accepted: "Verified accepted", not_accepted: "Not accepted", unknown: "Unknown" } as const;
 
-export function CapacityWorkspace({ sheets, payers, zctas, canEdit, canEditPayers, tz }: { sheets: Sheet[]; payers: { id: string; name: string }[]; zctas: { zcta5: string; label: string }[]; canEdit: boolean; canEditPayers: boolean; tz: string }) {
+export function CapacityWorkspace({ sheets, payers, zctas, canEdit, canEditPayers }: { sheets: Sheet[]; payers: { id: string; name: string }[]; zctas: { zcta5: string; label: string }[]; canEdit: boolean; canEditPayers: boolean }) {
   const router = useRouter();
   const [editing, setEditing] = useState<Sheet | null>(null);
   const [editingPayers, setEditingPayers] = useState<Sheet | null>(null);

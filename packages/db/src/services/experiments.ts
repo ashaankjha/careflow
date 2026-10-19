@@ -1,4 +1,4 @@
-import { analyzeExperiment, assignVariant, createExperimentSchema, median, type ArmOutcome } from "@careflow/core";
+import { analyzeExperiment, assignVariant, createExperimentSchema, type ArmOutcome } from "@careflow/core";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import type { z } from "zod";
 import type { Db, Executor } from "../client";
