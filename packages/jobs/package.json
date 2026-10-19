@@ -8,9 +8,9 @@
   "exports": { ".": "./src/index.ts" },
   "scripts": {
     "job": "tsx src/cli.ts",
-    "lint": "eslint src",
+    "lint": "eslint src test",
     "typecheck": "tsc -p tsconfig.json",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run"
   },
   "dependencies": { "@careflow/connectors": "workspace:*", "@careflow/core": "workspace:*", "@careflow/db": "workspace:*", "dotenv": "^16.4.7" },
   "devDependencies": { "tsx": "^4.19.2", "vitest": "^3.2.4", "@types/node": "^22.10.2" }

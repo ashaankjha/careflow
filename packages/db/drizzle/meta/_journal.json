@@ -29,6 +29,13 @@
       "when": 1792373503300,
       "tag": "0003_capacity_holds_history",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792373503600,
+      "tag": "0004_jobs_role_lockout",
+      "breakpoints": true
     }
   ]
 }

@@ -44,7 +44,7 @@ pnpm db:seed                  # deterministic synthetic fixture
 pnpm dev                      # http://localhost:3000 — serves requests as `careflow_app` (RLS enforced)
 ```
 
-**Two database roles.** `DATABASE_URL` is the owner/migration role (must be SUPERUSER or BYPASSRLS — the Compose `postgres` user is): it runs migrations, `db:seed`, `db:reset`, the jobs CLI and the demo-reset purge. The web app serves every request as the least-privilege `careflow_app` role from `APP_DATABASE_URL`, inside a transaction that sets `app.current_org`; row-level security is FORCEd on every tenant table. `pnpm db:migrate` creates the role idempotently (NOLOGIN in the migration, no secret) and then sets its LOGIN password from `APP_DATABASE_URL` — the `.env.example` password is **dev-only**. Using an existing PostgreSQL instead of Compose? The migration role also needs `CREATEROLE` (or create `careflow_app` yourself and give `APP_DATABASE_URL` a different user to skip the password sync).
+**Two database roles.** `DATABASE_URL` is the owner/migration role (must be SUPERUSER or BYPASSRLS — the Compose `postgres` user is): it runs migrations, `db:seed`, `db:reset` and the demo-reset purge. The web app and the jobs CLI serve every request as the least-privilege `careflow_app` role from `APP_DATABASE_URL`, inside a transaction that sets `app.current_org`; row-level security is FORCEd on every tenant table. `pnpm db:migrate` creates the role idempotently (NOLOGIN in the migration, no secret) and then sets its LOGIN password from `APP_DATABASE_URL` — the `.env.example` password is **dev-only**. Using an existing PostgreSQL instead of Compose? The migration role also needs `CREATEROLE` (or create `careflow_app` yourself and give `APP_DATABASE_URL` a different user to skip the password sync).
 
 ### Demo credentials (password for all: `demo-pass-2026`)
 
@@ -68,7 +68,7 @@ The login page has one-click persona buttons.
 | `pnpm db:migrate` | Apply typed Drizzle migrations (+ hand-written integrity/RLS migration) |
 | `pnpm db:seed` / `pnpm db:reset` | Seed / **reset everything to the exact seed state** (one command) |
 | `pnpm demo:reset` | Migrate + reset in one go |
-| `pnpm jobs <name>` | Run a cron-compatible job manually: `compute-daily-metrics`, `generate-missions`, `expire-holds`, `refresh-market` |
+| `pnpm jobs <name> [--org <uuid>]` | Run a cron-compatible job manually: `compute-daily-metrics`, `generate-missions`, `expire-holds`, `refresh-market`. Runs as the least-privilege app role (`APP_DATABASE_URL`, not the owner), once per organization in its own RLS-scoped transaction; all organizations by default, or only those listed with `--org` (comma-separated) |
 | `pnpm lint` · `pnpm typecheck` | ESLint (flat config) · strict TypeScript, all packages |
 | `pnpm test` | Vitest: core domain, connectors, DB integration (uses `TEST_DATABASE_URL`), API wrapper |
 | `pnpm test:e2e` | Playwright: production build, 7 demo workflows + capacity-hold reserve/release + equity audit + Kanban drag/drop + Spanish packet generate/approve + security (RBAC, nonce CSP) + keyboard + mobile + axe WCAG 2.1 A/AA scan of every screen; writes `docs/screenshots/` |
@@ -99,10 +99,11 @@ See [`.env.example`](.env.example). Defaults match the local/Compose setup.
 
 | Variable | Default | Notes |
 |---|---|---|
-| `DATABASE_URL` | `postgres://postgres:postgres@localhost:5432/careflow` | owner/migration role (SUPERUSER or BYPASSRLS); migrations, seed, reset, jobs, demo-reset purge |
-| `APP_DATABASE_URL` | `postgres://careflow_app:careflow_app_dev_only@localhost:5432/careflow` | least-privilege role for all web requests; **dev-only password** |
+| `DATABASE_URL` | `postgres://postgres:postgres@localhost:5432/careflow` | owner/migration role (SUPERUSER or BYPASSRLS); migrations, seed, reset, demo-reset purge |
+| `APP_DATABASE_URL` | `postgres://careflow_app:careflow_app_dev_only@localhost:5432/careflow` | least-privilege role for all web requests and the jobs CLI; **dev-only password** |
 | `TEST_DATABASE_URL` | `…/careflow_test` | must contain “test” |
 | `TEST_APP_DATABASE_URL` | `postgres://careflow_app:careflow_app_dev_only@…/careflow_test` | app role on the test DB (roles are cluster-wide: same password as `APP_DATABASE_URL`) |
+| `LOGIN_LOCKOUT_MAX_FAILURES`, `LOGIN_LOCKOUT_WINDOW_SECONDS`, `LOGIN_LOCKOUT_SECONDS` | `5`, `900`, `900` | per-account sign-in lockout: N consecutive failures within the window lock that email for the cool-down, whatever the IP |
 | `DEMO_RESET_ENABLED` | enabled | set `false` to disable *Settings → Reset* (and stop the web app from using `DATABASE_URL`) |
 | `EXPERIMENT_HMAC_SALT` | dev value | HMAC salt for assignments; change in any shared deployment (sessions are random tokens stored as SHA-256 hashes) |
 | `SEED_ANCHOR_DATE` | today | `YYYY-MM-DD` for byte-identical resets |

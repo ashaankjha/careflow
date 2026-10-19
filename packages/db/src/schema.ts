@@ -691,3 +691,20 @@ export const rateLimitBuckets = pgTable(
   },
   (t) => [index("rate_limit_buckets_window_idx").on(t.windowStart)],
 );
+
+/**
+ * Per-account sign-in failure streaks (migration 0004, UNLOGGED). Not tenant
+ * data and not under RLS; the app role has no direct privileges and goes
+ * through SECURITY DEFINER functions. `accountKey` is the SHA-256 hex of the
+ * normalized email, so no email address is stored.
+ */
+export const loginAttempts = pgTable(
+  "login_attempts",
+  {
+    accountKey: text("account_key").primaryKey(),
+    failures: integer("failures").notNull(),
+    firstFailureAt: ts("first_failure_at").notNull(),
+    lockedUntil: ts("locked_until"),
+  },
+  (t) => [index("login_attempts_first_failure_idx").on(t.firstFailureAt)],
+);
