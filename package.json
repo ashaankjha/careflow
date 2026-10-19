@@ -1,0 +1,31 @@
+{
+  "name": "careflow",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.28.0",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "dev": "pnpm --filter @careflow/web dev",
+    "build": "turbo run build",
+    "start": "pnpm --filter @careflow/web start",
+    "db:generate": "pnpm --filter @careflow/db db:generate",
+    "db:migrate": "pnpm --filter @careflow/db db:migrate",
+    "db:seed": "pnpm --filter @careflow/db db:seed",
+    "db:reset": "pnpm --filter @careflow/db db:reset",
+    "demo:reset": "pnpm db:migrate && pnpm db:reset",
+    "jobs": "pnpm --filter @careflow/jobs run job",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test --concurrency=1",
+    "test:e2e": "pnpm --filter @careflow/web test:e2e",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "eslint": "^9.17.0",
+    "prettier": "^3.4.2",
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.1"
+  }
+}
