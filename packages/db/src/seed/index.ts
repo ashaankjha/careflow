@@ -41,6 +41,32 @@ export function seedNow(): Date {
   return d;
 }
 
+/**
+ * The simulator's choices depend on which events would fall after "now", so simulating at
+ * the wall clock gives a different story at different times of day. Instead, simulate at the
+ * latest 18:00 UTC at or before `now` (the time SEED_ANCHOR_DATE uses) and shift every
+ * simulated timestamp forward to `now`: every reset replays the same story, ending at `now`.
+ */
+export function storyReference(now: Date): Date {
+  const ref = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 18, 0, 0, 0));
+  if (ref.getTime() > now.getTime()) ref.setTime(ref.getTime() - DAY);
+  return ref;
+}
+
+function simulateStory(now: Date) {
+  const ref = storyReference(now);
+  const sim = simulateInquiries(ref);
+  const shift = now.getTime() - ref.getTime();
+  if (shift === 0) return sim;
+  const at = (d: Date) => new Date(d.getTime() + shift);
+  for (const q of sim.inquiries) {
+    q.createdAt = at(q.createdAt);
+    q.stageEnteredAt = at(q.stageEnteredAt);
+  }
+  for (const e of sim.events) e.occurredAt = at(e.occurredAt);
+  return sim;
+}
+
 const DEMO_ORGS = [HARBOR.id, LAKESIDE.id];
 
 /** Seeded capacity history: ops re-attests the (unchanged) sheet every 28 days. */
@@ -128,7 +154,7 @@ async function purgeDemoData(tx: Tx) {
 export async function seedDatabase(db: Db, opts: { now?: Date } = {}) {
   const now = opts.now ?? seedNow();
   const ago = (days: number) => new Date(now.getTime() - days * DAY);
-  const sim = simulateInquiries(now);
+  const sim = simulateStory(now);
 
   await db.transaction(async (tx) => {
     await purgeDemoData(tx);

@@ -7,7 +7,7 @@ import {
   type MissionStatus,
   type OrgSignals,
 } from "@careflow/core";
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { Db, Executor } from "../client";
 import { centers, contentDrafts, dailyMetrics, experiments, missionEvidence, missions } from "../schema";
 import { audit } from "./audit";
@@ -136,10 +136,27 @@ export async function generateMissions(db: Db, ctx: Ctx) {
 
   await db.transaction(async (tx) => {
     for (const p of proposals) {
-      const [existing] = await tx
+      let [existing] = await tx
         .select()
         .from(missions)
         .where(and(eq(missions.organizationId, ctx.orgId), eq(missions.dedupeKey, p.dedupeKey)));
+      if (!existing) {
+        // A still-unreviewed proposal for the same site + rule from an earlier reporting week is
+        // refreshed (and re-keyed to this week) rather than duplicated. Reviewed missions do not block.
+        [existing] = await tx
+          .select()
+          .from(missions)
+          .where(
+            and(
+              eq(missions.organizationId, ctx.orgId),
+              eq(missions.ruleId, p.ruleId),
+              p.centerId ? eq(missions.centerId, p.centerId) : isNull(missions.centerId),
+              eq(missions.status, "proposed"),
+            ),
+          )
+          .orderBy(desc(missions.generatedAt))
+          .limit(1);
+      }
       let missionId: string;
       if (!existing) {
         const [m] = await tx

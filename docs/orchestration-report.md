@@ -2,18 +2,19 @@
 
 **Status: synthetic sandbox only. Not HIPAA-compliant and not approved for real patient data** (see `security-production-gates.md`).
 
-This round closed the MVP backlog listed in `agent-decisions.md` and the risk registry. Six workstreams ran in parallel child sessions, each on its own `claude/careflow-ws-*` branch with assigned files and migration numbers. Each branch was merged in turn into `claude/careflow-ai-mvp-gyrzv4` with merge commits (no history rewrites). The full gate set was re-run after every merge. PRD §20 stretch items were not touched.
+This round closed the MVP backlog listed in `agent-decisions.md` and the risk registry. Eight workstreams ran in child sessions (six in the main round, two in a final hardening round), each on its own `claude/careflow-ws-*` branch with assigned files and migration numbers. Each branch was merged in turn into `claude/careflow-ai-mvp-gyrzv4` with merge commits (no history rewrites). The full gate set was re-run after every merge. PRD §20 stretch items were not touched.
 
 ## Gate results (integrated branch, starting from dropped databases and a dropped app role)
 
 | Gate | Before | After |
 |---|---|---|
-| `pnpm db:migrate && pnpm db:reset` | ✓ | ✓ (4 migrations: 0000–0003) |
+| `pnpm db:migrate && pnpm db:reset` | ✓ | ✓ (5 migrations: 0000–0004) |
 | `pnpm lint`, `pnpm typecheck` | ✓ | ✓ |
-| `pnpm test` (Vitest) | 99 | **238** (core 125, db 88, web 16, connectors 9) |
-| `pnpm test:e2e` (Playwright, production build) | 11 | **24** (includes 8 axe specs covering ~16 screens/states and a nonce-CSP check) |
+| `pnpm test` (Vitest) | 99 | **266** (core 125, db 99, web 27, connectors 9, jobs 6) |
+| `pnpm test:e2e` (Playwright, production build) | 11 | **26** (includes 9 axe specs covering ~17 screens/states, nonce-CSP and CSP-report checks) |
+| GitHub Actions CI | none | ✓ green on this branch |
 
-The seeded acceptance chain is unchanged and covered by E2E workflows 3, 5 and 7:
+The seeded acceptance chain is unchanged and covered by E2E workflows 3, 5 and 7, and it is now identical at any time of day (see the seed fix below):
 - Meridian is accepted by West, not North.
 - Editing West staff hours makes West a potential fit.
 - Generating missions adds West M2/M6/M7; the seed alone yields M1 North, M3 North and M4 South.
@@ -29,6 +30,8 @@ The seeded acceptance chain is unchanged and covered by E2E workflows 3, 5 and 7
 | **Quality** (`ws-quality`) — CI, a11y, R3 | <ul><li>`.github/workflows/ci.yml`: Postgres 16 service, migrate, seed, lint, typecheck, test, E2E, and the Playwright report uploaded on failure.</li><li>`@axe-core/playwright` scans every screen, with violations fixed at the source and no rule exceptions.</li><li>Per-request nonce CSP in middleware: `'strict-dynamic'`, no `'unsafe-inline'` scripts.</li><li>Root-caused the flaky overview filter test, which was also flaky on the base branch. The `(app)/loading.tsx` boundary hung same-page search-param navigations in production builds, so the file was removed.</li></ul> | `a11y.spec.ts`, CSP E2E, `middleware.test.ts`. |
 | **Kanban** (`ws-kanban`, optional) | Native HTML5 drag-and-drop between stage columns, plus a keyboard and touch "Move to…" menu. Both call the existing transition API. Illegal target columns are disabled, server errors roll the card back, and moves that need a reason open the drawer. Viewers can neither drag nor move. | `legalMoves` unit tests; E2E workflow 10; axe scan of the board. |
 | **Locale** (`ws-locale`, optional) | `es-US` deterministic draft templates. English output is unchanged (snapshot test). The claim validator now has Spanish rules and a HIPAA-claim rule in both languages. Pages set `lang` correctly, and the UI says the Spanish text is machine-authored and needs human translator review before any real use. | Core and db tests; E2E workflow 11; axe scans of the Spanish editor, print page and export. |
+| **Jobs role + lockout** (`ws-jobsrole`, final round) — R1/R2 residuals | <ul><li>Migration `0004_jobs_role_lockout`. The jobs CLI runs only as `careflow_app`, once per organization inside a `withOrg` transaction. Organizations come from `careflow_job_org_ids()` (ids only), or `--org`. Job audit rows have no actor.</li><li>Per-account sign-in lockout: 5 failures in 15 min lock that email for 15 min, whatever the IP. It is keyed by a SHA-256 of the email, so unknown emails behave identically, and the 429 response is the same generic message. The app role reaches `login_attempts` only through SECURITY DEFINER functions.</li></ul> | `jobs-app-role.test.ts` (6), `login-lockout.test.ts` (8), `login-lockout-route.test.ts` (2). |
+| **Polish** (`ws-polish`, final round) — R3 residual, locale | <ul><li>CSP `report-uri` / `report-to` point only at a same-origin `POST /api/v1/csp-report`. It has an 8 KB cap and a per-IP limit, and logs a sanitized one-line summary (directive, blocked origin, path without query string).</li><li>EN/ES language badges on drafts in the missions list.</li></ul> | `csp-report.test.ts`; E2E asserts the report directives and zero reports while navigating every screen; workflow 11 checks the badge. |
 
 ## Integration fixes made by the orchestrator
 
@@ -37,14 +40,21 @@ The seeded acceptance chain is unchanged and covered by E2E workflows 3, 5 and 7
 - Pointed the equity route test at the least-privilege app-role pool. It returned 401 under the new tenancy model.
 - Extended axe coverage to the equity tab and the reserved-hold drawer.
 - Merged the documentation conflicts so that every workstream's caveats were kept.
+- **Fixed a pre-existing seed bug found during final verification.** The simulator stops drawing random numbers once an event would fall after "now", so a reset at different times of day produced a different story. Between roughly 02:00 and 04:00 UTC the seed grew an extra **M6 South** mission, breaking the "exactly M1 North, M3 North, M4 South" guarantee. The tests never caught it because they pin 18:00 UTC.
+  - The fix simulates at the latest 18:00 UTC at or before now and shifts every simulated timestamp forward to now. The story is identical at any hour and still ends at now. Pinned 18:00 anchors are byte-identical to before.
+  - Mission generation also duplicated still-unreviewed proposals once a new reporting week began. Those are now refreshed and re-keyed instead.
+  - Covered by `seed-stability.test.ts`.
 
 ## Deferred / remaining limitations (and why)
 
 - **CI runs green on GitHub Actions** for this branch (runs on pushes of `97caf6f` and `f8557e7` succeeded: migrate, seed, lint, typecheck, test and E2E against a Postgres 16 service). **Docker is not verified:** `docker-compose.yml` was reviewed by reading only, because there is no Docker daemon here.
-- **Jobs CLI still runs as the owner role.** A scoped jobs role needs its own policy design. This is listed under R1 residuals.
+- **Jobs CLI** now runs as the app role (done). The job host still holds the app-role secret, and `careflow_job_org_ids()` lets that role list organization ids.
 - **The demo-reset button uses the owner connection.** It purges both demo tenants. It can be turned off with `DEMO_RESET_ENABLED=false`, which is required before any shared deployment.
-- **Rate limiter is not a WAF.** The sign-in IP key comes from `X-Forwarded-For` and can be spoofed without a trusted proxy. There is no per-account lockout.
-- **`style-src 'unsafe-inline'` remains.** React, Radix and Recharts set inline style attributes. There is no CSP violation reporting yet.
+- **Rate limiter is not a WAF.** The sign-in IP key comes from `X-Forwarded-For` and can be spoofed without a trusted proxy. Per-account lockout is built, but:
+  - anyone who knows an email can lock it for the cool-down, and there is no unlock flow;
+  - the email hash is unsalted;
+  - lockouts survive `db:reset` until they expire.
+- **`style-src 'unsafe-inline'` remains.** React, Radix and Recharts set inline style attributes. CSP violation reports reach the server log only; there is no aggregation or alerting.
 - **Capacity limits:**
   - History versions only the capacity sheet; payer participation and site profile are applied as currently recorded.
   - Holds subtract from the weekly total, not from specific time windows.
