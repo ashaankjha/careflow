@@ -149,7 +149,8 @@ export function generateMissionProposals(
     // M1 — capacity bottleneck
     if (
       c.recentInquiries >= p.m1MinInquiries &&
-      ((vh !== null && vh < p.m1MaxVerifiedHours) || vh === null || failShare >= p.m1FailedMatchShare)
+      // low verified serviceable capacity, OR many failed matches while the site has no material verified headroom
+      (vh === null || vh < p.m1MaxVerifiedHours || (failShare >= p.m1FailedMatchShare && vh < p.m2MinVerifiedHours))
     ) {
       m1Flagged.add(c.centerId);
       out.push(

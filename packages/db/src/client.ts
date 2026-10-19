@@ -8,7 +8,14 @@ export type Executor = Db | Tx;
 
 export function createDb(url: string, opts: { max?: number } = {}) {
   const client = postgres(url, { max: opts.max ?? 10, onnotice: () => {}, prepare: true });
-  return { db: drizzle(client, { schema }), client };
+  const db = drizzle(client, { schema });
+  // drizzle installs pass-through timestamp serializers (it maps columns itself); raw `sql` templates
+  // may still pass Date objects, so serialize those to ISO-8601 here.
+  const serializeDate = (v: unknown) => (v instanceof Date ? v.toISOString() : v);
+  for (const oid of ["1082", "1083", "1114", "1184", "1182", "1185", "1115", "1231"]) {
+    (client.options.serializers as Record<string, (v: unknown) => unknown>)[oid] = serializeDate;
+  }
+  return { db, client };
 }
 
 const globalForDb = globalThis as unknown as { __careflowDb?: ReturnType<typeof createDb> };

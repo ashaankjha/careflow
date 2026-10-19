@@ -265,7 +265,7 @@ export async function capacityFit(db: Executor, ctx: Ctx, f: MetricFilters) {
       const pc = perCenter.get(q.center_id) ?? { evaluated: 0, notFeasibleAtCenter: 0, fitAnywhere: 0 };
       pc.evaluated++;
       const atCenter = res.matches.find((m) => m.centerId === q.center_id);
-      if (atCenter && atCenter.eligibility !== "potential_fit") pc.notFeasibleAtCenter++;
+      if (atCenter && atCenter.eligibility === "not_feasible") pc.notFeasibleAtCenter++;
       if (anyFit) pc.fitAnywhere++;
       perCenter.set(q.center_id, pc);
     }

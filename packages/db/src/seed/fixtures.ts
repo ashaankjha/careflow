@@ -137,7 +137,7 @@ const MORNING = { start: 8 * 60, end: 12 * 60 };
 const AFTERNOON = { start: 13 * 60, end: 18 * 60 };
 const WEEKDAYS = [1, 2, 3, 4, 5];
 
-/** Aggregated weekly *unbooked* staff hours per window (8–12 rows per site). */
+/** Aggregated weekly *unbooked* staff hours per window (12–14 rows per site). */
 export const CAPACITY_WINDOWS: Record<string, W[]> = {
   // North: afternoons fully booked (0 verified hours) → afternoon RBT bottleneck.
   north: [
@@ -147,29 +147,30 @@ export const CAPACITY_WINDOWS: Record<string, W[]> = {
   ],
   // West: verified morning hours; new afternoon hours entered by the location manager, pending ops verification.
   west: [
-    { role: "RBT", days: WEEKDAYS, ...MORNING, hours: 2, mode: "center", verifiedDaysAgo: 5 },
-    { role: "RBT", days: WEEKDAYS, ...AFTERNOON, hours: 3, mode: "center", verifiedDaysAgo: null },
+    { role: "RBT", days: WEEKDAYS, ...MORNING, hours: 4, mode: "center", verifiedDaysAgo: 5 },
+    { role: "RBT", days: WEEKDAYS, ...AFTERNOON, hours: 5, mode: "center", verifiedDaysAgo: null },
     { role: "BCBA", days: [2, 4], start: 8 * 60, end: 17 * 60, hours: 3, mode: "center", verifiedDaysAgo: 5 },
   ],
   // South: reasonable staffing; throughput limited by benefits verification.
   south: [
-    { role: "RBT", days: WEEKDAYS, ...MORNING, hours: 2, mode: "center", verifiedDaysAgo: 4 },
-    { role: "RBT", days: WEEKDAYS, start: 14 * 60, end: 18 * 60, hours: 2, mode: "home", verifiedDaysAgo: 4 },
+    { role: "RBT", days: WEEKDAYS, ...MORNING, hours: 3, mode: "center", verifiedDaysAgo: 4 },
+    { role: "RBT", days: WEEKDAYS, ...AFTERNOON, hours: 4, mode: "center", verifiedDaysAgo: 4 },
+    { role: "RBT", days: [2, 4], start: 9 * 60, end: 18 * 60, hours: 4, mode: "home", verifiedDaysAgo: 4 },
     { role: "BCBA", days: [1, 4], start: 8 * 60, end: 17 * 60, hours: 4.5, mode: "center", verifiedDaysAgo: 4 },
   ],
 };
 
 export const CAPACITY_RULES: Record<string, { payer: string | null; ratio: number | null; minRbt: number | null; maxNew: number | null; verified: boolean }[]> = {
-  north: [{ payer: null, ratio: 0.1, minRbt: 1, maxNew: 2, verified: true }],
-  west: [{ payer: null, ratio: 0.1, minRbt: 1, maxNew: 3, verified: true }],
+  north: [{ payer: null, ratio: 0.1, minRbt: 1, maxNew: 4, verified: true }],
+  west: [{ payer: null, ratio: 0.1, minRbt: 1, maxNew: 4, verified: true }],
   south: [
-    { payer: null, ratio: 0.1, minRbt: 1, maxNew: 3, verified: true },
+    { payer: null, ratio: 0.1, minRbt: 1, maxNew: 6, verified: true },
     { payer: "pinecrest", ratio: 0.125, minRbt: 1, maxNew: null, verified: true },
   ],
 };
 
 export const PARTNERS = [
-  { key: "bayview", name: "Bayview Pediatrics Group (DEMO)", category: "pediatrics", zcta: "00106", status: "active", permission: "granted", code: "BAYPEDS", weight: 10 },
+  { key: "bayview", name: "Bayview Pediatrics Group (DEMO)", category: "pediatrics", zcta: "00106", status: "active", permission: "granted", code: "BAYPEDS", weight: 22 },
   { key: "cedar", name: "Cedar Park Speech & Language (DEMO)", category: "speech_therapy", zcta: "00103", status: "active", permission: "granted", code: "CEDARSLP", weight: 2 },
   { key: "riverbend", name: "Riverbend Developmental Pediatrics (DEMO)", category: "developmental_pediatrics", zcta: "00107", status: "active", permission: "granted", code: "RVBDEV", weight: 2 },
   { key: "southport_ot", name: "Southport Occupational Therapy (DEMO)", category: "occupational_therapy", zcta: "00111", status: "active", permission: "granted", code: "SPORTOT", weight: 1.5 },

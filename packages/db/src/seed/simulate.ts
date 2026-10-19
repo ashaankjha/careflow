@@ -85,10 +85,10 @@ export function simulateInquiries(now: Date, seed = 20261019): { inquiries: SimI
       count: 65,
       zctas: [["00111", 6], ["00110", 3], ["00112", 3], ["00107", 2], ["00106", 2], ["00109", 1]],
       payers: [["cascade", 40], ["pinecrest", 35], ["meridian", 15], [null, 10]],
-      modes: [["center", 55], ["home", 45]],
+      modes: [["center", 80], ["home", 20]],
       afternoonShare: 0.5,
       firstResponseHours: () => (rng.chance(0.2) ? lognormalHours(34, 0.8) : lognormalHours(8, 1.2)),
-      benefitsDays: () => (rng.chance(0.75) ? rng.int(13, 34) : rng.int(5, 9)),
+      benefitsDays: () => (rng.chance(0.85) ? rng.int(14, 40) : rng.int(5, 9)),
       waitlistAtQualified: () => 0.05,
       partnerWeight: 1,
     },
@@ -119,6 +119,12 @@ export function simulateInquiries(now: Date, seed = 20261019): { inquiries: SimI
       const windows = uniqDays.map((d) =>
         afternoon ? { dayOfWeek: d, startMinute: 15 * 60, endMinute: 18 * 60 } : { dayOfWeek: d, startMinute: 8 * 60 + 30, endMinute: 12 * 60 },
       );
+      // Families never request more direct hours than their own preferred windows contain.
+      const requestFor = (ws: { startMinute: number; endMinute: number }[]) => {
+        const windowHours = ws.reduce((s, w) => s + (w.endMinute - w.startMinute) / 60, 0);
+        const options = [4, 5, 6, 8, 10].filter((h) => h <= windowHours * 0.7);
+        return options.length ? rng.pick(options) : 4;
+      };
       const source = rng.weighted([
         ["professional_referral", 32 * prof.partnerWeight],
         ["website_form", 28],
@@ -140,7 +146,7 @@ export function simulateInquiries(now: Date, seed = 20261019): { inquiries: SimI
         payerId: payerKey ? payerId(payerKey) : null,
         preferredModes: [mode],
         windows,
-        requestedHours: rng.chance(0.2) ? null : rng.pick([6, 8, 10, 10, 12, 15]),
+        requestedHours: rng.chance(0.2) ? null : requestFor(windows),
         sourceChannel: source,
         referralCode: partner?.code ?? null,
         referralCodeId: partner?.code ? referralCodeId(partner.code) : null,
