@@ -100,6 +100,30 @@ export function allowedTransitions(from: Stage): Stage[] {
   return ["contacted"];
 }
 
+/** Columns shown on the intake Kanban board, in display order. */
+export const BOARD_STAGES: Stage[] = [...ACTIVE_STAGES, "waitlisted"];
+
+/**
+ * True when a move cannot be made in one click and must go through the inquiry
+ * drawer: a mandatory reason (waitlist / close / reopen) or a verified care
+ * start (site selection + staff verification).
+ */
+export function transitionNeedsInput(from: Stage, to: Stage): boolean {
+  return requiresReason(from, to) || to === "started";
+}
+
+export type BoardMove = { to: Stage; needsInput: boolean };
+
+/**
+ * Legal moves for a card in stage `from`, restricted to `targets` (defaults to
+ * every stage) and returned in `targets` order. Illegal targets are omitted, so
+ * the board can disable them while dragging.
+ */
+export function legalMoves(from: Stage, targets: readonly Stage[] = ALL_STAGES): BoardMove[] {
+  const allowed = allowedTransitions(from);
+  return targets.filter((t) => allowed.includes(t)).map((to) => ({ to, needsInput: transitionNeedsInput(from, to) }));
+}
+
 export class TransitionError extends Error {
   readonly code = "INVALID_TRANSITION" as const;
   constructor(

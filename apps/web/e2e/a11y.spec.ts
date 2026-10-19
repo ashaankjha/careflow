@@ -127,3 +127,12 @@ test("inquiry drawer with a reserved capacity hold", async ({ page }) => {
   await expect(page.getByTestId("holds").getByTestId("hold-reserved")).toBeVisible();
   await expectAccessible(page, "drawer with reserved hold");
 });
+
+test("intake Kanban board with move menus", async ({ page }) => {
+  await loginAs(page, "intake");
+  await page.goto("/intake");
+  await page.getByRole("button", { name: "Kanban" }).click();
+  await expect(page.getByTestId("kanban-card").first()).toBeVisible();
+  await expect(page.getByTestId("kanban-move").first()).toBeVisible();
+  await expectAccessible(page, "intake kanban");
+});

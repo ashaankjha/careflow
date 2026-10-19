@@ -61,7 +61,7 @@ const HOLD_STATUS: Record<Hold["effectiveStatus"], { label: string; tone: "good"
   expired: { label: "Expired", tone: "outline" },
 };
 
-export function InquiryDrawer({ id, onClose, perms, owners, centers, tz }: { id: string | null; onClose: () => void; perms: Perms; owners: { id: string; displayName: string }[]; centers: Option[]; tz: string }) {
+export function InquiryDrawer({ id, onClose, perms, owners, centers, tz, pendingStage = null }: { id: string | null; onClose: () => void; perms: Perms; owners: { id: string; displayName: string }[]; centers: Option[]; tz: string; pendingStage?: Stage | null }) {
   const router = useRouter();
   const [detail, setDetail] = useState<Detail | null>(null);
   const [match, setMatch] = useState<{ result: MatchResult; snapshots: { generatedAt: string }[] } | null>(null);
@@ -92,9 +92,11 @@ export function InquiryDrawer({ id, onClose, perms, owners, centers, tz }: { id:
     setDetail(null);
     setMatch(null);
     setHolds(null);
-    setPending(null);
+    // a Kanban move that needs a reason opens the drawer with the reason prompt
+    setPending(pendingStage);
+    setReason("");
     void load();
-  }, [load]);
+  }, [load, pendingStage]);
 
   async function act(fn: () => Promise<unknown>, ok: string) {
     setBusy(true);
@@ -172,7 +174,7 @@ export function InquiryDrawer({ id, onClose, perms, owners, centers, tz }: { id:
                 <div className="mt-3 rounded-lg border border-warn/30 bg-warn-soft/50 p-3">
                   <Label htmlFor="reason">Reason for moving to {STAGE_LABELS[pending]} (required, administrative only)</Label>
                   <div className="flex gap-2">
-                    <Input id="reason" value={reason} maxLength={280} onChange={(e) => setReason(e.target.value)} placeholder="e.g. No verified capacity in preferred windows" />
+                    <Input id="reason" autoFocus value={reason} maxLength={280} onChange={(e) => setReason(e.target.value)} placeholder="e.g. No verified capacity in preferred windows" />
                     <Button variant="primary" size="sm" className="h-9" disabled={!reason.trim()} loading={busy} onClick={() => transition(pending)}>Confirm</Button>
                     <Button size="sm" className="h-9" variant="ghost" onClick={() => setPending(null)}>Cancel</Button>
                   </div>
