@@ -41,7 +41,8 @@ Typed Next.js route handlers in `apps/web/src/app/api/v1`. All handlers except `
 | `POST /missions/:id/status` | `mission:status` | `in_progress` / `done` |
 | `GET/POST /experiments` | `experiment:read` / `experiment:manage` | `createExperimentSchema` (randomized needs ≥2 variants summing to 100, unit ≠ none) |
 | `POST /experiments/:id/start` · `/complete` | `experiment:manage` | start persists HMAC assignments for randomized designs |
-| `GET /experiments/:id/results` | `experiment:read` | arms, Wilson intervals, difference, verdict, caveats, guardrails |
+| `GET /experiments/:id/results` | `experiment:read` | arms, intervals (`intervalMethod`: `wilson_newcombe`, or `cluster_robust` for partner/site-week randomization with `clustersWithData` per arm and `minClustersPerArm`), difference (+ `df`), verdict, caveats, guardrails |
+| `GET /equity?days=30..365&centerId=` | `equity:read` (admin, growth, ops) | equity audit: aggregate payer-group access rates with small-cell suppression — see below |
 | `GET/POST /partners` · `POST /partners/:id/referral-code` | `partner:read` / `partner:manage` | aggregate attribution only |
 | `GET /drafts` · `GET/PUT /drafts/:id` | `mission:read` / `draft:edit` | PUT `{bodyMd, title?, revision}` → re-validated |
 | `POST /drafts/generate` | `draft:generate` | `{missionId?, centerId?, partnerId?, kind, locale}`; mission must be approved |
@@ -81,3 +82,24 @@ Typed Next.js route handlers in `apps/web/src/app/api/v1`. All handlers except `
 ```
 
 (Illustrative synthetic output, not an assertion of real availability.)
+
+## Equity audit: `GET /equity`
+
+Aggregate-only, descriptive access rates per payer group for the inquiry creation cohort in the last `days` (default 90; 30–365), optionally one site. **Equity audit only — never used for scoring, ranking, matching or exclusion.** Returns counts only (no inquiry identifiers). `422` on invalid `days`/`centerId`, `404` for a site outside the tenant, `403` for intake/viewer roles.
+
+```json
+{
+  "notice": "Equity audit only — never used for scoring, ranking, matching or exclusion. …",
+  "minCellSize": 5,
+  "window": { "from": "…", "to": "…", "days": 90 },
+  "steps": [{ "key": "contact_within_sla", "label": "First contact within SLA", "denominatorLabel": "…" }, …],
+  "overall": { "key": "overall", "label": "All payer groups", "inquiries": 150, "inquiriesSuppressed": null,
+               "steps": { "care_started": { "numerator": 30, "denominator": 150, "rate": 0.2, "differenceVsOverall": 0, "suppressed": null }, … } },
+  "groups": [{ "key": "not_recorded", "label": "Payer not recorded", "inquiries": 18,
+               "steps": { "contact_within_sla": { "numerator": null, "denominator": null, "rate": null, "differenceVsOverall": null, "suppressed": "primary" }, … } }, …],
+  "suppressedCells": 4,
+  "caveats": ["…"]
+}
+```
+
+`suppressed` is `"primary"` (small cell), `"complementary"` (hidden so a small cell cannot be derived from totals) or `null`. Definitions: [metric definitions](metric-definitions.md#equity-audit-access-rates-by-payer-group).

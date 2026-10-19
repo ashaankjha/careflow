@@ -12,3 +12,4 @@ export * from "./partners";
 export * from "./market";
 export * from "./session";
 export * from "./demo";
+export * from "./equity";

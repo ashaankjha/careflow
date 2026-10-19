@@ -1,4 +1,4 @@
-import { analyzeExperiment, assignVariant, createExperimentSchema, type ArmOutcome } from "@careflow/core";
+import { analyzeExperiment, assignVariant, createExperimentSchema, MIN_CLUSTERS_PER_ARM, unitHmac, type ArmOutcome } from "@careflow/core";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import type { z } from "zod";
 import type { Db, Executor } from "../client";
@@ -9,7 +9,6 @@ import {
   experimentVariants,
   experiments,
   missions,
-  referralCodes,
   referralPartners,
 } from "../schema";
 import { audit } from "./audit";
@@ -263,29 +262,72 @@ export async function experimentResults(db: Executor, ctx: Ctx, id: string) {
       .select({ variantId: experimentAssignments.variantId, partnerId: experimentAssignments.unitRef })
       .from(experimentAssignments)
       .where(and(eq(experimentAssignments.organizationId, ctx.orgId), eq(experimentAssignments.experimentId, e.id)));
+    // Per-partner counts: the partner is the unit of randomization (cluster).
+    const partnerIds = assigned.filter((a) => a.partnerId).map((a) => a.partnerId!);
+    const perPartner = new Map<string, { denominator: number; successes: number }>();
+    if (partnerIds.length) {
+      const rowsByPartner = await q<{ partner_id: string; den: number; succ: number }>(
+        db,
+        sql`select rc.partner_id, count(*)::int den,
+                   count(*) filter (where exists (select 1 from inquiry_events e where e.organization_id = i.organization_id and e.inquiry_id = i.id and e.event_type = 'care_started_verified_by_staff'))::int succ
+            from inquiries i join referral_codes rc on rc.organization_id = i.organization_id and rc.id = i.referral_code_id
+            where i.organization_id = ${ctx.orgId} and rc.partner_id in (${sql.join(partnerIds.map((id) => sql`${id}`), sql`, `)})
+              and i.created_at >= ${start} and i.created_at < ${end}
+            group by rc.partner_id`,
+      );
+      for (const r of rowsByPartner) perPartner.set(r.partner_id, { denominator: Number(r.den), successes: Number(r.succ) });
+    }
     for (const v of e.variants) {
-      const partnerIds = assigned.filter((a) => a.variantId === v.id && a.partnerId).map((a) => a.partnerId!);
-      let den = 0;
-      let succ = 0;
-      if (partnerIds.length) {
-        const codes = await db
-          .select({ id: referralCodes.id })
-          .from(referralCodes)
-          .where(and(eq(referralCodes.organizationId, ctx.orgId), inArray(referralCodes.partnerId, partnerIds)));
-        if (codes.length) {
-          const [r] = await q<{ den: number; succ: number }>(
-            db,
-            sql`select count(*)::int den, count(*) filter (where exists (select 1 from inquiry_events e where e.organization_id = i.organization_id and e.inquiry_id = i.id and e.event_type = 'care_started_verified_by_staff'))::int succ
-                from inquiries i where i.organization_id = ${ctx.orgId} and i.referral_code_id in (${sql.join(codes.map((c) => sql`${c.id}`), sql`, `)})
-                  and i.created_at >= ${start} and i.created_at < ${end}`,
-          );
-          den = Number(r?.den ?? 0);
-          succ = Number(r?.succ ?? 0);
-        }
-      }
-      arms.push({ key: v.key, label: v.description, units: partnerIds.length, denominator: den, successes: succ });
+      const clusters = assigned
+        .filter((a) => a.variantId === v.id && a.partnerId)
+        .map((a) => perPartner.get(a.partnerId!) ?? { denominator: 0, successes: 0 });
+      arms.push({
+        key: v.key,
+        label: v.description,
+        units: clusters.length,
+        denominator: clusters.reduce((x, c) => x + c.denominator, 0),
+        successes: clusters.reduce((x, c) => x + c.successes, 0),
+        clusters,
+      });
     }
     unitLabel = "referred inquiries";
+  } else if (e.designType === "randomized" && e.assignmentUnit === "site_week" && e.assignmentCount > 0) {
+    comparison = `Intention-to-treat by randomized site-week at ${e.centerName}; outcomes counted per inquiry created in each assigned week.`;
+    const assigned = await db
+      .select({ variantId: experimentAssignments.variantId, unitHmac: experimentAssignments.unitHmac })
+      .from(experimentAssignments)
+      .where(and(eq(experimentAssignments.organizationId, ctx.orgId), eq(experimentAssignments.experimentId, e.id)));
+    const variantByHash = new Map(assigned.map((a) => [a.unitHmac, a.variantId]));
+    // Site-week unit ids are reconstructed from the start date (the same ids startExperiment hashed).
+    const weeks = Math.ceil(e.plannedDurationDays / 7);
+    const weekRows = await q<{ wk: number; den: number; succ: number }>(
+      db,
+      sql`select floor(extract(epoch from (i.created_at - ${start}::timestamptz)) / ${7 * 86400})::int wk, count(*)::int den,
+                 count(*) filter (where exists (select 1 from inquiry_events e where e.organization_id = i.organization_id and e.inquiry_id = i.id and e.event_type = 'care_started_verified_by_staff'))::int succ
+          from inquiries i where i.organization_id = ${ctx.orgId} and i.center_id = ${e.centerId} and i.created_at >= ${start} and i.created_at < ${end}
+          group by 1`,
+    );
+    const byWeek = new Map(weekRows.map((r) => [Number(r.wk), { denominator: Number(r.den), successes: Number(r.succ) }]));
+    const clustersByVariant = new Map<string, { denominator: number; successes: number }[]>();
+    for (let i = 0; i < weeks; i++) {
+      const unitId = `${e.centerId}:${new Date(start.getTime() + i * 7 * DAY).toISOString().slice(0, 10)}`;
+      const variantId = variantByHash.get(unitHmac(hmacSalt(), e.id, unitId));
+      if (!variantId) continue;
+      const list = clustersByVariant.get(variantId) ?? [];
+      list.push(byWeek.get(i) ?? { denominator: 0, successes: 0 });
+      clustersByVariant.set(variantId, list);
+    }
+    for (const v of e.variants) {
+      const clusters = clustersByVariant.get(v.id) ?? [];
+      arms.push({
+        key: v.key,
+        label: v.description,
+        units: clusters.length,
+        denominator: clusters.reduce((x, c) => x + c.denominator, 0),
+        successes: clusters.reduce((x, c) => x + c.successes, 0),
+        clusters,
+      });
+    }
   } else {
     const baselineFrom = new Date(start.getTime() - e.baselineDays * DAY);
     const metric = e.primaryMetric;
@@ -304,6 +346,7 @@ export async function experimentResults(db: Executor, ctx: Ctx, id: string) {
     hasPersistedAssignments: e.assignmentCount > 0,
     arms,
     minSamplePerArm: policy.experimentMinSamplePerArm,
+    minClustersPerArm: MIN_CLUSTERS_PER_ARM,
     observationDays,
     typicalDaysToStart: successLabel === "verified care starts" ? typicalDaysToStart : null,
     simulated: e.simulated,

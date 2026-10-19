@@ -20,7 +20,11 @@ type Exp = {
 };
 type Results = {
   randomized: boolean; verificationSource: string; dataVintage: string; simulated: boolean; unitLabel: string; successLabel: string; comparison: string; observationDays: number; typicalDaysToStart: number | null;
-  analysis: { verdict: string; verdictLabel: string; arms: { key: string; label: string; units: number; denominator: number; successes: number; rate: number | null; interval: { low: number; high: number } | null }[]; difference: { absolute: number | null; relative: number | null; interval: { low: number; high: number } | null } | null; caveats: string[] };
+  analysis: {
+    verdict: string; verdictLabel: string; intervalMethod: "wilson_newcombe" | "cluster_robust"; minClustersPerArm: number | null;
+    arms: { key: string; label: string; units: number; denominator: number; successes: number; rate: number | null; interval: { low: number; high: number } | null; clustersWithData: number | null; designEffect: number | null }[];
+    difference: { absolute: number | null; relative: number | null; interval: { low: number; high: number } | null; df: number | null } | null; caveats: string[];
+  };
   guardrails: { baseline: { inquiries: number; medianFirstResponseHours: number | null; closeWithoutResolution: number }; post: { inquiries: number; medianFirstResponseHours: number | null; closeWithoutResolution: number } };
 };
 
@@ -121,12 +125,12 @@ export function ExperimentsWorkspace({ experiments, centers, canManage, initialI
               {!res ? <p className="text-[13px] text-ink-3">Computing from the event log…</p> : (
                 <div className="space-y-4">
                   <table className="w-full text-[12.5px]">
-                    <thead><tr className="text-left text-[11px] uppercase tracking-wide text-ink-3"><th className="pb-2">Arm</th><th className="pb-2 text-right">Units</th><th className="pb-2 text-right">{res.successLabel} / {res.unitLabel}</th><th className="pb-2 text-right">Rate</th><th className="w-1/3 pb-2 pl-4">95% Wilson interval</th></tr></thead>
+                    <thead><tr className="text-left text-[11px] uppercase tracking-wide text-ink-3"><th className="pb-2">Arm</th><th className="pb-2 text-right">{res.analysis.intervalMethod === "cluster_robust" ? "Clusters (with data)" : "Units"}</th><th className="pb-2 text-right">{res.successLabel} / {res.unitLabel}</th><th className="pb-2 text-right">Rate</th><th className="w-1/3 pb-2 pl-4">{res.analysis.intervalMethod === "cluster_robust" ? "95% cluster-robust interval" : "95% Wilson interval"}</th></tr></thead>
                     <tbody>
                       {res.analysis.arms.map((a) => (
                         <tr key={a.key} className="border-t border-line/70">
                           <td className="py-2 pr-2"><div className="font-medium">{a.key}</div><div className="text-[11.5px] text-ink-3">{a.label}</div></td>
-                          <td className="py-2 text-right tabular">{a.units}</td>
+                          <td className="py-2 text-right tabular" data-testid="arm-clusters">{a.clustersWithData != null ? `${a.units} (${a.clustersWithData})` : a.units}</td>
                           <td className="py-2 text-right tabular">{a.successes} / {a.denominator}</td>
                           <td className="py-2 text-right font-semibold tabular">{fmtPct(a.rate, 1)}</td>
                           <td className="py-2 pl-4">{a.interval && a.rate != null ? <div><IntervalBar low={a.interval.low} high={a.interval.high} rate={a.rate} /><div className="text-[11px] text-ink-3 tabular">{fmtPct(a.interval.low, 1)} – {fmtPct(a.interval.high, 1)}</div></div> : <span className="text-ink-4">n/a</span>}</td>
@@ -139,7 +143,7 @@ export function ExperimentsWorkspace({ experiments, centers, canManage, initialI
                       <span className="font-medium">Difference ({res.analysis.arms[1]?.key} − {res.analysis.arms[0]?.key}):</span>{" "}
                       {res.analysis.difference.absolute == null ? "—" : `${(res.analysis.difference.absolute * 100).toFixed(1)} pts`}
                       {res.analysis.difference.relative != null && ` (${(res.analysis.difference.relative * 100).toFixed(0)}% relative)`}
-                      {res.analysis.difference.interval ? ` · 95% CI ${(res.analysis.difference.interval.low * 100).toFixed(1)} to ${(res.analysis.difference.interval.high * 100).toFixed(1)} pts` : " · no interval reported (not eligible)"}
+                      {res.analysis.difference.interval ? ` · 95% ${res.analysis.intervalMethod === "cluster_robust" ? `cluster-robust CI (t, ${res.analysis.difference.df} df)` : "CI"} ${(res.analysis.difference.interval.low * 100).toFixed(1)} to ${(res.analysis.difference.interval.high * 100).toFixed(1)} pts` : " · no interval reported (not eligible)"}
                       {res.analysis.verdict !== "estimate" && <span className="text-ink-3"> — descriptive, not a causal lift.</span>}
                     </div>
                   )}
@@ -158,6 +162,7 @@ export function ExperimentsWorkspace({ experiments, centers, canManage, initialI
                   <div className="flex flex-wrap gap-x-6 gap-y-1 border-t border-line pt-3 text-[11.5px] text-ink-3">
                     <span>verification_source: {res.verificationSource}</span>
                     <span>data vintage: {fmtDate(res.dataVintage, tz)}</span>
+                    {res.analysis.minClustersPerArm != null && <span>min clusters per arm: {res.analysis.minClustersPerArm}</span>}
                     <span>observation: {res.observationDays} d (typical inquiry→start {res.typicalDaysToStart ? Math.round(res.typicalDaysToStart) : "—"} d)</span>
                     {res.simulated && <SyntheticBadge label="Simulated — not measured live" />}
                   </div>

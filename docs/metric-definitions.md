@@ -65,6 +65,24 @@ Per site: `floor(min(verified RBT hours − proposed/reserved hold hours, (verif
 
 Inquiries (and how many have a verified start) grouped by first-party referral code recorded at creation, plus an explicit **Unattributed** bucket (no code or unrecognized code) and a per-channel breakdown. Single-touch, first-party only — not multi-touch or incremental attribution.
 
+## Equity audit: access rates by payer group
+
+*Equity audit only — never used for scoring, ranking, matching or exclusion.* Computed in `packages/db/src/services/equity.ts` (SQL aggregation) and `packages/core/src/equity.ts` (rates + suppression). Descriptive, not causal.
+
+* **Cohort:** inquiries created in `[now − days, now)` (default 90), optional site filter. Outcomes are counted up to the report time, so recent inquiries are right-censored.
+* **Group:** `payers.category` of the inquiry's recorded payer; inquiries without a payer form *Payer not recorded*. Payer listings are not verified benefits.
+* **Steps** (numerator / denominator):
+  * `contact_within_sla` — first `outreach_attempted` within `firstResponseSlaHours` / inquiries answered or older than the SLA (same rule as `median_first_response_hours`).
+  * `match_proposed` — a `center_match_selected` event or a current `proposed`/`reserved` capacity hold / cohort inquiries. A proposed match is **not** an appointment.
+  * `assessment_scheduled` — an `assessment_scheduled_by_staff` event / cohort inquiries.
+  * `care_started` — a `care_started_verified_by_staff` event / cohort inquiries.
+* **Difference vs overall:** group rate − all-groups rate (proportion points); shown only when both are unsuppressed.
+* **Small-cell suppression** (tenant `minCellSize`, default 5 = `k`):
+  * primary — a group's inquiry count in `1..k−1`; a step cell whose denominator is `< k`, or whose numerator **or** complement (denominator − numerator) is in `1..k−1`; any step cell of a row whose inquiry count is hidden; and the overall cell under the same rules;
+  * complementary — per additive column (inquiry counts, each step's numerators, each step's denominators): if exactly one group value is hidden while the total is shown, the smallest remaining group value is hidden too (ties by position); if no group is left, the total is hidden;
+  * a cell's numerator, denominator, rate and difference are shown together or not at all. Zero counts are shown.
+* **Limits:** suppression is per report; differencing two reports (e.g. two sites, two windows) is not prevented — see security gate R11.
+
 ## Known biases and caveats
 
 * **Right censoring** — recent cohorts have had less time to start; typical inquiry-to-start in the seed is ~38 days.

@@ -30,6 +30,7 @@ export const ACTIONS = [
   "draft:export",
   "experiment:read",
   "experiment:manage",
+  "equity:read",
   "partner:read",
   "partner:manage",
   "settings:read",
@@ -65,6 +66,7 @@ const MATRIX: Record<Role, ReadonlySet<Action>> = {
     "draft:approve",
     "draft:export",
     "experiment:manage",
+    "equity:read",
     "partner:manage",
   ]),
   intake: new Set<Action>([
@@ -85,6 +87,7 @@ const MATRIX: Record<Role, ReadonlySet<Action>> = {
     "mission:status",
     "draft:approve",
     "audit:read",
+    "equity:read",
   ]),
   viewer: new Set<Action>(READ),
 };

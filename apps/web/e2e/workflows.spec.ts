@@ -156,3 +156,26 @@ test("7. reset demo restores the exact seed state", async ({ page }) => {
   await page.goto("/settings");
   await shot(page, "07-settings");
 });
+
+test("8. equity audit tab shows suppressed, aggregate-only payer-group rates", async ({ page }) => {
+  await loginAs(page, "ops");
+  await page.goto("/experiments");
+  await page.getByTestId("tab-equity").click();
+  const panel = page.getByTestId("equity-panel");
+  await expect(panel).toBeVisible();
+  await expect(page.getByTestId("equity-notice")).toHaveText("Equity audit only — never used for scoring, ranking, matching or exclusion.");
+  await expect(page.getByTestId("equity-row-overall")).toContainText("All payer groups");
+  await expect(page.getByTestId("equity-row-commercial")).toBeVisible();
+  await expect(page.getByTestId("equity-min-cell")).toContainText("Small-cell threshold: 5");
+  await expect(page.getByTestId("equity-table").getByText("suppressed", { exact: false }).first()).toBeVisible();
+  await expect(page.getByTestId("equity-caveats")).toContainText("Nothing here is causal");
+  await page.getByLabel("Site").selectOption({ label: "North Center" });
+  await expect(panel).toContainText("North Center");
+  await shot(page, "08-equity-audit");
+  // read-only location managers do not get the equity audit
+  await page.context().clearCookies();
+  await loginAs(page, "viewer");
+  await page.goto("/experiments");
+  await expect(page.getByTestId("experiment-item").first()).toBeVisible();
+  await expect(page.getByTestId("tab-equity")).toHaveCount(0);
+});

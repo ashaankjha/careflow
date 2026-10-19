@@ -1,6 +1,6 @@
 import { createHmac } from "node:crypto";
 import { z } from "zod";
-import { newcombeDiffInterval, safeRate, wilsonInterval } from "./stats";
+import { clusterDiffInterval, clusterRateInterval, newcombeDiffInterval, safeRate, wilsonInterval, type ClusterCount } from "./stats";
 
 export const ASSIGNMENT_UNITS = ["partner", "site_week", "page_session", "none"] as const;
 export const DESIGN_TYPES = ["randomized", "quasi_experimental", "observational"] as const;
@@ -70,26 +70,55 @@ export function assignVariant<V extends { key: string; allocationPct: number }>(
   return { variant: variants[variants.length - 1]!, unitHash };
 }
 
-export type ArmOutcome = { key: string; label: string; units: number; denominator: number; successes: number };
+/**
+ * Minimum number of clusters (partners or site-weeks) with at least one
+ * observation required in every arm before a cluster-randomized experiment
+ * reports a difference interval. Below ~10 clusters per arm cluster-robust
+ * standard errors are unreliable, so the verdict stays "insufficient evidence".
+ */
+export const MIN_CLUSTERS_PER_ARM = 10;
+
+export const CLUSTER_UNITS: readonly AssignmentUnit[] = ["partner", "site_week"];
+
+/**
+ * Outcome counts for one arm. For cluster-randomized designs `clusters` holds
+ * the per-unit (partner / site-week) counts so uncertainty can respect the unit
+ * of randomization; individually randomized arms omit it.
+ */
+export type ArmOutcome = { key: string; label: string; units: number; denominator: number; successes: number; clusters?: ClusterCount[] };
+
+export type IntervalMethod = "wilson_newcombe" | "cluster_robust";
 
 export type ExperimentAnalysis = {
   verdict: "insufficient_evidence" | "descriptive_only" | "estimate";
   verdictLabel: string;
-  arms: (ArmOutcome & { rate: number | null; interval: { low: number; high: number } | null })[];
-  difference: { absolute: number | null; relative: number | null; interval: { low: number; high: number } | null } | null;
+  intervalMethod: IntervalMethod;
+  minClustersPerArm: number | null;
+  arms: (Omit<ArmOutcome, "clusters"> & {
+    rate: number | null;
+    interval: { low: number; high: number } | null;
+    /** Clusters with ≥1 observation (cluster-randomized designs only). */
+    clustersWithData: number | null;
+    designEffect: number | null;
+  })[];
+  difference: { absolute: number | null; relative: number | null; interval: { low: number; high: number } | null; df: number | null } | null;
   caveats: string[];
 };
 
 /**
- * Honest analysis: randomized + adequate N => intention-to-treat estimate with
- * Wilson/Newcombe intervals. Anything else => descriptive or insufficient.
- * Never declares significance; never auto-stops.
+ * Honest analysis: randomized + adequate N => intention-to-treat estimate.
+ * Individually randomized: Wilson per arm, Newcombe for the difference.
+ * Cluster-randomized (partner / site-week): cluster-robust ratio intervals with
+ * t critical values over the clusters, and "insufficient evidence" until every
+ * arm has `minClustersPerArm` clusters with data. Anything else => descriptive
+ * or insufficient. Never declares significance; never auto-stops.
  */
 export function analyzeExperiment(input: {
   designType: DesignType;
   hasPersistedAssignments: boolean;
   arms: ArmOutcome[];
   minSamplePerArm: number;
+  minClustersPerArm?: number;
   observationDays: number;
   typicalDaysToStart: number | null;
   simulated: boolean;
@@ -97,12 +126,21 @@ export function analyzeExperiment(input: {
 }): ExperimentAnalysis {
   const caveats: string[] = [];
   if (input.simulated) caveats.push("SIMULATED: outcomes come from synthetic demo events, not measured live results.");
-  const arms = input.arms.map((a) => ({
-    ...a,
-    rate: safeRate(a.successes, a.denominator),
-    interval: wilsonInterval(a.successes, a.denominator),
-  }));
   const randomized = input.designType === "randomized" && input.hasPersistedAssignments;
+  const clustered = randomized && CLUSTER_UNITS.includes(input.assignmentUnit);
+  const minClusters = input.minClustersPerArm ?? MIN_CLUSTERS_PER_ARM;
+  const arms = input.arms.map(({ clusters, ...a }) => {
+    const rate = safeRate(a.successes, a.denominator);
+    if (!clustered) return { ...a, rate, interval: wilsonInterval(a.successes, a.denominator), clustersWithData: null, designEffect: null };
+    const cr = clusters ? clusterRateInterval(clusters) : null;
+    return {
+      ...a,
+      rate,
+      interval: cr ? { low: cr.low, high: cr.high } : null,
+      clustersWithData: clusters ? clusters.filter((c) => c.denominator > 0).length : 0,
+      designEffect: cr?.designEffect ?? null,
+    };
+  });
   if (input.designType === "randomized" && !input.hasPersistedAssignments) {
     caveats.push("Labelled randomized but no persisted assignments exist — treated as observational.");
   }
@@ -111,9 +149,10 @@ export function analyzeExperiment(input: {
       "Non-randomized comparison: seasonal, staffing, payer-mix and referral-pattern confounding are likely. No causal lift is claimed.",
     );
   }
-  if (input.assignmentUnit === "partner" || input.assignmentUnit === "site_week") {
+  const unitName = input.assignmentUnit === "partner" ? "partners" : "site-weeks";
+  if (clustered) {
     caveats.push(
-      `Randomized by ${input.assignmentUnit.replace("_", "-")}, outcomes counted per inquiry: intervals ignore clustering and are optimistic.`,
+      `Randomized by ${input.assignmentUnit.replace("_", "-")}: intervals are cluster-robust over ${unitName} (pooled-rate ratio estimator, t critical value on clusters − 1 df, never narrower than the per-inquiry interval). With few clusters they remain approximate.`,
     );
   }
   const shortWindow = input.typicalDaysToStart !== null && input.observationDays < input.typicalDaysToStart;
@@ -124,26 +163,52 @@ export function analyzeExperiment(input: {
   }
   const lowN = arms.some((a) => a.denominator < input.minSamplePerArm);
   if (lowN) caveats.push(`Fewer than ${input.minSamplePerArm} observations in at least one arm (configured minimum).`);
+  const lowClusters = clustered && arms.some((a) => (a.clustersWithData ?? 0) < minClusters);
+  if (lowClusters) {
+    caveats.push(
+      `Fewer than ${minClusters} ${unitName} with data in at least one arm (${arms.map((a) => `${a.key}: ${a.clustersWithData ?? 0}`).join(", ")}): cluster-level uncertainty cannot be estimated reliably.`,
+    );
+  }
 
   let difference: ExperimentAnalysis["difference"] = null;
   if (arms.length >= 2) {
     const [t, c] = [arms[1]!, arms[0]!]; // arms[0] = control/baseline
     if (t.rate !== null && c.rate !== null) {
-      difference = {
-        absolute: t.rate - c.rate,
-        relative: c.rate > 0 ? (t.rate - c.rate) / c.rate : null,
-        interval:
-          randomized && !lowN ? newcombeDiffInterval(t.successes, t.denominator, c.successes, c.denominator) : null,
-      };
+      let interval: { low: number; high: number } | null = null;
+      let df: number | null = null;
+      if (randomized && !lowN && !lowClusters) {
+        if (clustered) {
+          const cd = clusterDiffInterval(input.arms[1]!.clusters ?? [], input.arms[0]!.clusters ?? []);
+          if (cd) {
+            interval = { low: cd.low, high: cd.high };
+            df = cd.df;
+          }
+        } else {
+          interval = newcombeDiffInterval(t.successes, t.denominator, c.successes, c.denominator);
+        }
+      }
+      difference = { absolute: t.rate - c.rate, relative: c.rate > 0 ? (t.rate - c.rate) / c.rate : null, interval, df };
     }
   }
   const verdict: ExperimentAnalysis["verdict"] =
-    lowN || shortWindow ? "insufficient_evidence" : randomized ? "estimate" : "descriptive_only";
+    lowN || shortWindow || lowClusters || (randomized && !difference?.interval)
+      ? "insufficient_evidence"
+      : randomized
+        ? "estimate"
+        : "descriptive_only";
   const verdictLabel =
     verdict === "insufficient_evidence"
       ? "Insufficient evidence"
       : verdict === "estimate"
         ? "Intention-to-treat estimate (with uncertainty)"
         : "Descriptive only — not causal";
-  return { verdict, verdictLabel, arms, difference, caveats };
+  return {
+    verdict,
+    verdictLabel,
+    intervalMethod: clustered ? "cluster_robust" : "wilson_newcombe",
+    minClustersPerArm: clustered ? minClusters : null,
+    arms,
+    difference,
+    caveats,
+  };
 }
